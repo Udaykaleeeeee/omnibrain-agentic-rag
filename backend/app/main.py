@@ -1,19 +1,27 @@
 from fastapi import FastAPI
+from backend.app.api.routes import router
+
+print("MAIN.PY LOADED")
 
 app = FastAPI(
-    title="OmniBrain Agentic RAG",
-    description="Month 1 Internship Project",
+    title="OmniBrain",
+    description="Agentic Multi-Modal RAG Orchestrator",
     version="1.0.0"
 )
+
+# Include all API routes
+app.include_router(router)
+
 
 @app.get("/")
 def home():
     return {
-        "message": "Welcome to OmniBrain Agentic RAG"
+        "message": "Welcome to OmniBrain"
     }
+
 
 @app.get("/health")
 def health():
     return {
-        "status": "Backend is running successfully!"
+        "status": "Backend Running"
     }
