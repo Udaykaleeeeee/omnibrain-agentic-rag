@@ -1,16 +1,13 @@
 from fastapi import FastAPI
-from backend.app.api.routes import router
-
-print("MAIN.PY LOADED")
+from app.api.routes import router
 
 app = FastAPI(
     title="OmniBrain",
-    description="Agentic Multi-Modal RAG Orchestrator",
+    description="Multi-format document ingestion with OCR",
     version="1.0.0"
 )
 
-# Include all API routes
-app.include_router(router)
+app.include_router(router, tags=["ingestion"])
 
 
 @app.get("/")
@@ -23,5 +20,5 @@ def home():
 @app.get("/health")
 def health():
     return {
-        "status": "Backend Running"
+        "status": "Running"
     }
