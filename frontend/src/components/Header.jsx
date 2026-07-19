@@ -4,16 +4,21 @@ import { FaBrain } from "react-icons/fa";
 function Header() {
   return (
     <header className="header">
-      <div className="header-title">
-        <FaBrain className="logo" />
+      <div className="logo-wrapper">
+        <div className="brain">
+          <FaBrain />
+        </div>
 
-        <div>
+        <div className="title-group">
           <h1>OmniBrain</h1>
-          <h2>Agentic RAG</h2>
+          <h2>Agentic RAG Platform</h2>
         </div>
       </div>
 
-      <p>Upload your PDF and start chatting with your documents.</p>
+      <p>
+        Upload your PDF and interact intelligently with your documents using
+        Agentic AI.
+      </p>
     </header>
   );
 }

@@ -5,7 +5,11 @@ const API = axios.create({
 });
 
 export const uploadPDF = (formData) => {
-  return API.post("/upload-pdf", formData);
+  return API.post("/ingest", formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+  });
 };
 
 export default API;

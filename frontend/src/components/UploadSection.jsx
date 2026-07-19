@@ -1,17 +1,22 @@
 import { useRef, useState } from "react";
-import { FaFilePdf, FaCloudUploadAlt } from "react-icons/fa";
-import { uploadPDF } from "../services/api";
+import {
+  FaCloudUploadAlt,
+  FaFilePdf,
+} from "react-icons/fa";
+
 import "./UploadSection.css";
+import { uploadPDF } from "../services/api";
 
 function UploadSection() {
   const fileInputRef = useRef(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [status, setStatus] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleFileChange = (event) => {
-    if (event.target.files.length > 0) {
-      setSelectedFile(event.target.files[0]);
+  const handleFileChange = (e) => {
+    if (e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
       setStatus("");
     }
   };
@@ -26,40 +31,45 @@ function UploadSection() {
     formData.append("file", selectedFile);
 
     try {
+      setLoading(true);
+
       const response = await uploadPDF(formData);
-      setStatus(response.data.message);
+
+      console.log(response.data);
+
+      setStatus("Document uploaded successfully.");
     } catch (error) {
       console.error(error);
 
       if (error.response) {
-        setStatus(error.response.data.message || "Upload failed.");
+        setStatus("Upload failed.");
       } else {
         setStatus("Cannot connect to backend.");
       }
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div className="upload-card">
-      <h2 className="upload-heading">
-        <FaFilePdf className="pdf-icon" />
-        Upload PDF
-      </h2>
+    <div className="upload-card card">
 
-      <p className="subtitle">
-        Upload your PDF to begin your AI conversation.
+      <h2>Document Upload</h2>
+
+      <p className="upload-subtitle">
+        Securely upload your document and begin an AI-powered conversation instantly.
       </p>
 
-      <div className="upload-box">
-        <div className="upload-icon">
-          <FaCloudUploadAlt />
-        </div>
+      <div
+        className="drop-zone"
+        onClick={() => fileInputRef.current.click()}
+      >
 
-        <p className="drag-text">
-          Select a PDF to upload
-        </p>
+        <FaCloudUploadAlt className="cloud-icon" />
 
-        <span>or</span>
+        <h3>Drag & Drop PDF Here</h3>
+
+        <p>or click to browse</p>
 
         <input
           type="file"
@@ -69,39 +79,38 @@ function UploadSection() {
           onChange={handleFileChange}
         />
 
-        <button
-          className="select-btn"
-          onClick={() => fileInputRef.current.click()}
-        >
-          Select PDF
-        </button>
       </div>
 
-      <div className="file-info">
-        <strong>Selected File</strong>
+      <div className="selected-file-card">
+
+        <h4>Selected File</h4>
 
         {selectedFile ? (
-          <p className="selected-file">
-            <FaFilePdf className="small-icon" />
-            {selectedFile.name}
-          </p>
+          <div className="file-name">
+
+            <FaFilePdf />
+
+            <span>{selectedFile.name}</span>
+
+          </div>
         ) : (
-          <p>No PDF selected</p>
+          <p>No file selected</p>
         )}
+
       </div>
 
       <button
-        className="upload-btn"
+        className="upload-button"
         onClick={handleUpload}
+        disabled={loading}
       >
-        Upload PDF
+        {loading ? "Uploading..." : "Upload PDF"}
       </button>
 
       {status && (
-        <p className="status-message">
-          {status}
-        </p>
+        <p className="status">{status}</p>
       )}
+
     </div>
   );
 }
