@@ -1,7 +1,14 @@
-# 🚀 Development Milestones
+# OmniBrain Document Ingestion
 
-<<<<<<< HEAD
-Multi-agent RAG system with document ingestion.
+Multi-format document ingestion module with OCR support for RAG systems.
+
+## Features
+
+- **Multi-format parsing**: PDF, DOCX, TXT
+- **OCR integration**: Tesseract for scanned documents and images
+- **Text preprocessing**: Normalization, dehyphenation, header/footer removal
+- **REST API**: FastAPI endpoints for document upload
+- **Unified output**: Consistent ParsedDocument structure across all formats
 
 ## Quick Start
 
@@ -9,7 +16,7 @@ Multi-agent RAG system with document ingestion.
 # Install dependencies
 pip install -r requirements.txt
 
-# Optional: Install Tesseract for OCR
+# Install Tesseract OCR (optional, for scanned documents)
 sudo apt-get install tesseract-ocr  # Linux
 brew install tesseract              # macOS
 
@@ -18,17 +25,21 @@ cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-Visit: http://localhost:8000/docs
+## API Endpoints
 
-## API Usage
-
+**Upload Document**
 ```bash
-# Upload document
-curl -X POST "http://localhost:8000/ingest" -F "file=@document.pdf"
+curl -X POST "http://localhost:8000/ingest" \
+  -F "file=@document.pdf" \
+  -F "ocr_fallback=true"
+```
 
-# Check formats
+**Get Supported Formats**
+```bash
 curl http://localhost:8000/ingest/formats
 ```
+
+**API Documentation**: http://localhost:8000/docs
 
 ## Python Usage
 
@@ -38,148 +49,50 @@ from backend.app.ingestion import ingest_document
 result = ingest_document(
     file_path="document.pdf",
     filename="document.pdf",
-    document_id="doc-123"
+    document_id="doc-123",
+    ocr_fallback=True
 )
 
 print(f"Pages: {result['total_pages']}")
-print(f"OCR pages: {result['ocr_pages_used']}")
+print(f"OCR used: {result['ocr_pages_used']}")
+print(f"Chunks: {result['chunks_created']}")
 ```
 
-## Features
+## Architecture
 
-- PDF, DOCX, TXT parsing
-- OCR for scanned documents
-- Text preprocessing
-- REST API endpoints
+```
+backend/app/ingestion/
+├── models.py          # Data structures (ParsedDocument, ParsedPage, PageImage)
+├── router.py          # Format detection and parser routing
+├── pdf_parser.py      # PDF parsing with PyMuPDF
+├── docx_parser.py     # DOCX parsing with python-docx
+├── txt_parser.py      # TXT parsing with encoding detection
+├── ocr.py             # Tesseract OCR integration
+├── preprocessing.py   # Text cleaning and normalization
+└── pipeline.py        # Main orchestration
+```
 
-## Endpoints
+## Document Flow
 
-- `POST /ingest` - Upload document
-- `GET /ingest/formats` - List formats
-- `GET /docs` - API documentation
-=======
-## ✅ Milestone 1 – Backend Foundation & PDF Upload
+1. **Upload** → Document uploaded via REST API
+2. **Route** → Format detected, appropriate parser selected
+3. **Parse** → Text and images extracted
+4. **OCR** → Applied to scanned pages/images if needed
+5. **Preprocess** → Text cleaned and normalized
+6. **Output** → Structured ParsedDocument returned
 
-### Completed
-- Initialized the FastAPI backend application.
-- Designed the backend project structure.
-- Configured `main.py` and API routing using `APIRouter`.
-- Implemented the `POST /upload-pdf` endpoint.
-- Added PDF file validation (only `.pdf` files are accepted).
-- Created automatic `backend/uploads/` directory creation.
-- Successfully stored uploaded PDF files.
-- Tested all APIs using Swagger UI (`/docs`).
-- Verified backend functionality and completed the Git workflow (feature branch → commit → PR → merge).
+## Supported Formats
 
-**Status:** ✅ Completed & Merged
+- **PDF**: Text extraction + OCR for scanned pages
+- **DOCX**: Paragraph and image extraction with pseudo-page creation
+- **TXT**: Plain text with encoding auto-detection
 
----
+## Requirements
 
-## ✅ Milestone 2 – Chunking & Embedding Module
-
-### Completed
-- Implemented configurable text chunking with overlapping chunks.
-- Added text embedding generation using **BAAI BGE Small** (`BAAI/bge-small-en-v1.5`).
-- Added image embedding generation using **OpenCLIP** (`ViT-B-32`).
-- Created the initial embedding pipeline structure.
-- Installed and verified all required dependencies.
-- Reviewed, tested, and integrated the embedding module.
-
-**Status:** ✅ Completed & Merged
-
----
-
-## 🚧 Milestone 3 – PDF Ingestion Pipeline
-
-### Planned
-- Read uploaded PDF documents.
-- Extract text from PDFs.
-- Clean and preprocess extracted text.
-- Connect extraction with the chunking module.
-- Prepare chunks for embedding generation.
-
-**Status:** ⏳ In Progress
-
----
-
-## 🚧 Milestone 4 – Vector Database Integration
-
-### Planned
-- Generate embeddings for document chunks.
-- Store embeddings in **FAISS** or **Qdrant**.
-- Store document metadata.
-- Implement semantic similarity search.
-
-**Status:** ⏳ Pending
-
----
-
-## 🚧 Milestone 5 – Multi-Modal Retrieval
-
-### Planned
-- Retrieve relevant text chunks.
-- Retrieve image embeddings.
-- Build context generation pipeline.
-- Support hybrid retrieval.
-
-**Status:** ⏳ Pending
-
----
-
-## 🚧 Milestone 6 – Agentic AI Orchestrator
-
-### Planned
-- Implement LangGraph Supervisor Agent.
-- Integrate Search Agent.
-- Integrate Vision Agent.
-- Integrate SQL Agent.
-- Enable multi-agent task routing.
-
-**Status:** ⏳ Pending
-
----
-
-## 🚧 Milestone 7 – Evaluation & Guardrails
-
-### Planned
-- Add response validation.
-- Detect hallucinations.
-- Integrate NeMo Guardrails.
-- Add Langfuse monitoring.
-- Improve response reliability.
-
-**Status:** ⏳ Pending
-
----
-
-## 🚧 Milestone 8 – Deployment & Documentation
-
-### Planned
-- Perform end-to-end testing.
-- Complete API documentation.
-- Add Docker support.
-- Deploy the application.
-- Finalize project documentation.
-
-**Status:** ⏳ Pending
-
----
-
-# 📊 Current Project Progress
-
-| Module | Status |
-|---------|--------|
-| Backend Setup | ✅ Completed |
-| API Routing | ✅ Completed |
-| PDF Upload API | ✅ Completed |
-| Swagger Documentation | ✅ Completed |
-| Text Chunking | ✅ Completed |
-| Text Embeddings | ✅ Completed |
-| Image Embeddings | ✅ Completed |
-| PDF Ingestion | ⏳ In Progress |
-| Vector Database | ⏳ Pending |
-| Multi-Modal Retrieval | ⏳ Pending |
-| LangGraph Orchestrator | ⏳ Pending |
-| Evaluation & Guardrails | ⏳ Pending |
-| Deployment | ⏳ Pending |
->>>>>>> 26cbca42c9a13492e185627e84f30848cb191f6a
+- Python 3.8+
+- FastAPI
+- PyMuPDF (fitz)
+- python-docx
+- pytesseract
+- Pillow
+- Tesseract OCR (system package)
