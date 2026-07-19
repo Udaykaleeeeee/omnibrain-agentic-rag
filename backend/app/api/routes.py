@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import logging
 import uuid
 from pathlib import Path
@@ -10,10 +11,21 @@ from pydantic import BaseModel
 from ..ingestion import ingest_document, is_supported_format, get_supported_extensions
 
 logger = logging.getLogger(__name__)
+=======
+from fastapi import APIRouter, UploadFile, File
+import os
+import shutil
+
+print("=================================")
+print("ROUTES.PY LOADED")
+print(__file__)
+print("=================================")
+>>>>>>> 26cbca42c9a13492e185627e84f30848cb191f6a
 
 router = APIRouter()
 
 
+<<<<<<< HEAD
 # Response models
 class IngestResponse(BaseModel):
     document_id: str
@@ -134,3 +146,34 @@ async def ingest_document_endpoint(
                 temp_file_path.unlink()
         except Exception as e:
             logger.warning(f"Failed to cleanup temp file: {e}")
+=======
+@router.post("/upload-pdf")
+async def upload_pdf(file: UploadFile = File(...)):
+    """
+    Upload a PDF file and save it inside backend/uploads
+    """
+
+    # Check whether the uploaded file is PDF
+    if not file.filename.lower().endswith(".pdf"):
+        return {
+            "success": False,
+            "message": "Only PDF files are allowed."
+        }
+
+    upload_folder = "backend/uploads"
+
+    # Create uploads folder if it doesn't exist
+    os.makedirs(upload_folder, exist_ok=True)
+
+    file_path = os.path.join(upload_folder, file.filename)
+
+    # Save the file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    return {
+        "success": True,
+        "message": "PDF uploaded successfully.",
+        "filename": file.filename
+    }
+>>>>>>> 26cbca42c9a13492e185627e84f30848cb191f6a
