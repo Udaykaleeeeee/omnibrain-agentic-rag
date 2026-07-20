@@ -5,7 +5,7 @@ import {
 } from "react-icons/fa";
 
 import "./UploadSection.css";
-import { uploadPDF } from "../services/api";
+import { uploadDocument } from "../services/api";
 
 function UploadSection() {
   const fileInputRef = useRef(null);
@@ -33,11 +33,11 @@ function UploadSection() {
     try {
       setLoading(true);
 
-      const response = await uploadPDF(formData);
+      const response = await uploadDocument(formData);
 
       console.log(response.data);
 
-      setStatus("Document uploaded successfully.");
+      setStatus(response.data.message);
     } catch (error) {
       console.error(error);
 
