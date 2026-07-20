@@ -1,5 +1,6 @@
-<<<<<<< HEAD
 import logging
+import os
+import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
@@ -8,24 +9,22 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from ..ingestion import ingest_document, is_supported_format, get_supported_extensions
+from ..ingestion import (
+    ingest_document,
+    is_supported_format,
+    get_supported_extensions,
+)
 
 logger = logging.getLogger(__name__)
-=======
-from fastapi import APIRouter, UploadFile, File
-import os
-import shutil
 
 print("=================================")
 print("ROUTES.PY LOADED")
 print(__file__)
 print("=================================")
->>>>>>> 26cbca42c9a13492e185627e84f30848cb191f6a
 
 router = APIRouter()
 
 
-<<<<<<< HEAD
 # Response models
 class IngestResponse(BaseModel):
     document_id: str
@@ -146,7 +145,6 @@ async def ingest_document_endpoint(
                 temp_file_path.unlink()
         except Exception as e:
             logger.warning(f"Failed to cleanup temp file: {e}")
-=======
 @router.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     """
@@ -176,4 +174,3 @@ async def upload_pdf(file: UploadFile = File(...)):
         "message": "PDF uploaded successfully.",
         "filename": file.filename
     }
->>>>>>> 26cbca42c9a13492e185627e84f30848cb191f6a

@@ -5,6 +5,8 @@ from typing import Optional
 
 from .router import parse_document, is_supported_format
 from .models import ParsedDocument
+from app.models.chunking import TextChunker
+from app.models.embeddings import TextEmbeddingModel
 from .preprocessing import (
     preprocess_text,
     detect_repeated_headers_footers,
@@ -101,9 +103,20 @@ class IngestionPipeline:
         self.validate_file(file_path)
         doc = self.parse_and_preprocess(file_path, filename, mime_type)
         
-        chunks = []  # TODO: Chunking
-        embeddings = []  # TODO: Embedding
-        # TODO: Vector DB upsert
+        chunker = TextChunker(
+             chunk_size=500,
+            overlap=100
+  )
+
+        chunks = []
+
+        for page in doc.pages:
+            page_chunks = chunker.split_text(page.text)
+            chunks.extend(page_chunks)
+
+        embedding_model = TextEmbeddingModel()
+
+        embeddings = embedding_model.encode(chunks) if chunks else []
         
         return {
             "document_id": document_id,
