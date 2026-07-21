@@ -1,0 +1,79 @@
+.status-card {
+
+  padding: 28px 34px;
+
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: center;
+
+}
+
+.status-left {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 22px;
+
+}
+
+.status-icon {
+
+  width: 68px;
+
+  height: 68px;
+
+  border-radius: 18px;
+
+  background: #eef5ff;
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  font-size: 28px;
+
+  color: #2563eb;
+
+}
+
+.status-left h3 {
+
+  margin: 0;
+
+  font-size: 28px;
+
+  color: #0f172a;
+
+}
+
+.status-left p {
+
+  margin-top: 8px;
+
+  color: #64748b;
+
+  font-size: 18px;
+
+}
+
+.status-badge {
+
+  background: #fee2e2;
+
+  color: #dc2626;
+
+  font-weight: 700;
+
+  padding: 12px 26px;
+
+  border-radius: 999px;
+
+  font-size: 18px;
+
+}
