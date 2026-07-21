@@ -1,0 +1,23 @@
+Sample Text Document for Ingestion Testing
+==========================================
+
+This is a test document to verify the TXT ingestion functionality.
+
+Chapter 1: Introduction
+-----------------------
+This document contains multiple paragraphs and sections.
+The ingestion module should successfully extract this content.
+
+Chapter 2: Features
+-------------------
+- Text normalization
+- Header and footer removal
+- De-hyphenation of words
+- Whitespace cleaning
+
+Chapter 3: Conclusion
+--------------------
+The document ingestion module supports PDF, DOCX, and TXT formats.
+OCR is available for scanned documents when Tesseract is installed.
+
+End of Document.
