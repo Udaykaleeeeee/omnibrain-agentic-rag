@@ -5,8 +5,8 @@ from typing import Optional
 
 from .router import parse_document, is_supported_format
 from .models import ParsedDocument
-from app.models.chunking import TextChunker
-from app.models.embeddings import TextEmbeddingModel
+from ..models.chunking import TextChunker
+from ..models.embeddings import TextEmbeddingModel
 from .preprocessing import (
     preprocess_text,
     detect_repeated_headers_footers,
