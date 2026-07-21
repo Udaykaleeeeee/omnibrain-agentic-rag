@@ -1,6 +1,12 @@
 from PIL import Image
 import open_clip
 import torch
+import os
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ImageEmbeddingModel:
@@ -9,7 +15,7 @@ class ImageEmbeddingModel:
     """
 
     def __init__(self, model_name="ViT-B-32", pretrained="laion2b_s34b_b79k"):
-        print("Loading OpenCLIP model...")
+        logger.info("Loading OpenCLIP model...")
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -21,29 +27,42 @@ class ImageEmbeddingModel:
         self.model.to(self.device)
         self.model.eval()
 
-        print("OpenCLIP model loaded successfully!")
+        logger.info("OpenCLIP model loaded successfully!")
 
     def encode(self, image_path):
         """
         Generate embedding from an image.
         """
 
-        image = self.preprocess(Image.open(image_path)).unsqueeze(0).to(self.device)
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(
+                f"Image file '{image_path}' not found."
+            )
 
-        with torch.no_grad():
-            embedding = self.model.encode_image(image)
+        try:
+            image = self.preprocess(
+                Image.open(image_path)
+            ).unsqueeze(0).to(self.device)
 
-        embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+            with torch.no_grad():
+                embedding = self.model.encode_image(image)
 
-        return embedding.cpu().numpy().tolist()
+            embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+
+            return embedding.cpu().numpy().tolist()
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to generate image embedding: {e}"
+            )
 
 
 if __name__ == "__main__":
 
     model = ImageEmbeddingModel()
 
-    image_path = "sample.jpg"     # Test image
+    image_path = "sample.jpg"
 
     vector = model.encode(image_path)
 
-    print("Embedding dimension:", len(vector[0]))
+    logger.info(f"Embedding dimension: {len(vector[0])}")
