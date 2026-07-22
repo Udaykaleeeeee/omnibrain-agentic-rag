@@ -1,17 +1,22 @@
 """Document ingestion pipeline orchestration."""
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from .router import parse_document, is_supported_format
 from .models import ParsedDocument
-from ..models.chunking import TextChunker
-from ..models.embeddings import TextEmbeddingModel
 from .preprocessing import (
     preprocess_text,
     detect_repeated_headers_footers,
     is_empty_or_garbage
 )
+
+try:
+    from ..models.chunking import TextChunker
+    CHUNKER_AVAILABLE = True
+except ImportError:
+    CHUNKER_AVAILABLE = False
+    TextChunker = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +29,22 @@ class IngestionPipeline:
         ocr_fallback: bool = True,
         ocr_images: bool = True,
         remove_headers_footers: bool = True,
-        skip_empty_pages: bool = True
+        skip_empty_pages: bool = True,
+        chunk_size: int = 500,
+        chunk_overlap: int = 100
     ):
         self.ocr_fallback = ocr_fallback
         self.ocr_images = ocr_images
         self.remove_headers_footers = remove_headers_footers
         self.skip_empty_pages = skip_empty_pages
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        
+        if CHUNKER_AVAILABLE:
+            self.chunker = TextChunker(chunk_size=chunk_size, overlap=chunk_overlap)
+        else:
+            self.chunker = None
+            logger.warning("Chunking module not available - chunks will not be created")
     
     def validate_file(self, file_path: str) -> None:
         """Validate file exists and is supported format."""
@@ -92,6 +107,34 @@ class IngestionPipeline:
         
         return doc
     
+    def chunk_document(self, doc: ParsedDocument) -> List[dict]:
+        """Chunk document pages into smaller text segments."""
+        if not self.chunker:
+            logger.warning("Chunker not available - skipping chunking")
+            return []
+        
+        all_chunks = []
+        
+        for page in doc.pages:
+            if not page.text.strip():
+                continue
+            
+            page_chunks = self.chunker.split_text(page.text)
+            
+            for chunk_index, chunk_text in enumerate(page_chunks):
+                chunk = {
+                    "text": chunk_text,
+                    "page_number": page.page_number,
+                    "chunk_index": chunk_index,
+                    "source_format": doc.source_format,
+                    "filename": doc.filename,
+                    "is_ocr": page.is_ocr
+                }
+                all_chunks.append(chunk)
+        
+        logger.info(f"Created {len(all_chunks)} chunks from {doc.total_pages} pages")
+        return all_chunks
+    
     def ingest_document(
         self,
         file_path: str,
@@ -103,20 +146,24 @@ class IngestionPipeline:
         self.validate_file(file_path)
         doc = self.parse_and_preprocess(file_path, filename, mime_type)
         
-        chunker = TextChunker(
-             chunk_size=500,
-            overlap=100
-  )
-
-        chunks = []
-
-        for page in doc.pages:
-            page_chunks = chunker.split_text(page.text)
-            chunks.extend(page_chunks)
-
-        embedding_model = TextEmbeddingModel()
-
-        embeddings = embedding_model.encode(chunks) if chunks else []
+        chunks = self.chunk_document(doc)
+        
+        # Store chunks in memory (temporary storage)
+        from .storage import store_document
+        
+        document_data = {
+            "filename": filename,
+            "source_format": doc.source_format,
+            "total_pages": doc.total_pages,
+            "ocr_pages_used": doc.ocr_pages_used,
+            "metadata": doc.metadata
+        }
+        
+        store_document(document_id, document_data, chunks)
+        logger.info(f"Stored {len(chunks)} chunks for document {document_id}")
+        
+        # TODO: Embedding generation
+        # TODO: Vector DB upsert
         
         return {
             "document_id": document_id,

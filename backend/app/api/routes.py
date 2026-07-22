@@ -9,23 +9,21 @@ from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from ..ingestion import (
-    ingest_document,
-    is_supported_format,
-    get_supported_extensions,
+from ..ingestion import ingest_document, is_supported_format, get_supported_extensions
+from ..ingestion.storage import (
+    get_all_documents,
+    get_document,
+    get_chunks,
+    get_chunk,
+    get_stats,
+    delete_document
 )
 
 logger = logging.getLogger(__name__)
 
-print("=================================")
-print("ROUTES.PY LOADED")
-print(__file__)
-print("=================================")
-
 router = APIRouter()
 
 
-# Response models
 class IngestResponse(BaseModel):
     document_id: str
     filename: str
@@ -63,11 +61,9 @@ async def ingest_document_endpoint(
     skip_empty_pages: bool = Form(True)
 ):
     """Upload and ingest a document (PDF, DOCX, or TXT)."""
-    # Generate document ID if not provided
     if not document_id:
         document_id = str(uuid.uuid4())
     
-    # Validate file format
     if not is_supported_format(file.filename, file.content_type):
         raise HTTPException(
             status_code=400,
@@ -79,22 +75,18 @@ async def ingest_document_endpoint(
             }
         )
     
-    # Create temporary directory for uploads
     upload_dir = Path("temp_uploads")
     upload_dir.mkdir(exist_ok=True)
     
-    # Save uploaded file temporarily
     temp_file_path = upload_dir / f"{document_id}_{file.filename}"
     
     try:
-        # Save file
         with open(temp_file_path, "wb") as f:
             content = await file.read()
             f.write(content)
         
         logger.info(f"Processing document: {file.filename} ({document_id})")
         
-        # Ingest document
         result = ingest_document(
             file_path=str(temp_file_path),
             filename=file.filename,
@@ -111,7 +103,6 @@ async def ingest_document_endpoint(
             f"{result['total_pages']} pages, {result['ocr_pages_used']} OCR pages"
         )
         
-        # Build response
         return IngestResponse(
             document_id=result["document_id"],
             filename=result["filename"],
@@ -139,38 +130,87 @@ async def ingest_document_endpoint(
         )
     
     finally:
-        # Cleanup temporary file
         try:
             if temp_file_path.exists():
                 temp_file_path.unlink()
         except Exception as e:
             logger.warning(f"Failed to cleanup temp file: {e}")
-@router.post("/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    Upload a PDF file and save it inside backend/uploads
-    """
 
-    # Check whether the uploaded file is PDF
-    if not file.filename.lower().endswith(".pdf"):
-        return {
-            "success": False,
-            "message": "Only PDF files are allowed."
-        }
 
-    upload_folder = "backend/uploads"
 
-    # Create uploads folder if it doesn't exist
-    os.makedirs(upload_folder, exist_ok=True)
-
-    file_path = os.path.join(upload_folder, file.filename)
-
-    # Save the file
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
+@router.get("/documents")
+def list_documents():
+    """Get list of all ingested documents."""
+    documents = get_all_documents()
     return {
-        "success": True,
-        "message": "PDF uploaded successfully.",
-        "filename": file.filename
+        "total": len(documents),
+        "documents": documents
     }
+
+
+@router.get("/documents/{document_id}")
+def get_document_details(document_id: str):
+    """Get details for a specific document."""
+    document = get_document(document_id)
+    
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found"
+        )
+    
+    return document
+
+
+@router.get("/documents/{document_id}/chunks")
+def get_document_chunks(document_id: str):
+    """Get all chunks for a specific document."""
+    chunks = get_chunks(document_id)
+    
+    if chunks is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found"
+        )
+    
+    return {
+        "document_id": document_id,
+        "total_chunks": len(chunks),
+        "chunks": chunks
+    }
+
+
+@router.get("/documents/{document_id}/chunks/{chunk_index}")
+def get_specific_chunk(document_id: str, chunk_index: int):
+    """Get a specific chunk by index."""
+    chunk = get_chunk(document_id, chunk_index)
+    
+    if chunk is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Chunk {chunk_index} not found for document {document_id}"
+        )
+    
+    return chunk
+
+
+@router.delete("/documents/{document_id}")
+def delete_document_endpoint(document_id: str):
+    """Delete a document and all its chunks."""
+    success = delete_document(document_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found"
+        )
+    
+    return {
+        "message": f"Document {document_id} deleted successfully"
+    }
+
+
+@router.get("/stats")
+def get_storage_stats():
+    """Get storage statistics."""
+    return get_stats()
