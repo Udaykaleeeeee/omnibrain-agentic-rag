@@ -1,15 +1,16 @@
 import logging
-import os
-import shutil
 import uuid
 from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from ..ingestion import ingest_document, is_supported_format, get_supported_extensions
+from ..ingestion import (
+    ingest_document, 
+    is_supported_format, 
+    get_supported_extensions
+)
 from ..ingestion.storage import (
     get_all_documents,
     get_document,

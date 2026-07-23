@@ -4,6 +4,7 @@ Handles storing and retrieving embeddings.
 """
 
 import logging
+import uuid
 
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
@@ -82,7 +83,7 @@ class QdrantService:
         for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
 
             point = PointStruct(
-                id=index,
+                id=str(uuid.uuid4()),
                 vector=embedding,
                 payload={
                     "document_id": document_id,
