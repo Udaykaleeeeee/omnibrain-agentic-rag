@@ -1,0 +1,45 @@
+.accordion{
+    margin-top:28px;
+    padding:0;
+    overflow:hidden;
+}
+
+.accordion-header{
+
+    padding:24px 30px;
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    cursor:pointer;
+
+    user-select:none;
+
+}
+
+.accordion-header h3{
+
+    font-size:22px;
+
+    font-weight:700;
+
+    color:#0f172a;
+
+}
+
+.accordion-header svg{
+
+    color:#64748b;
+
+    font-size:18px;
+
+}
+
+.accordion-body{
+
+    padding:0 30px 28px;
+
+}
