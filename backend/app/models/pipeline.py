@@ -15,7 +15,8 @@ class IngestionPipeline:
 
     def process(self, pdf_path: str):
         """
-        Load PDF, split into chunks and generate embeddings.
+        Load PDF, split into chunks, generate embeddings,
+        and return metadata for each chunk.
         """
 
         # Load PDF
@@ -24,25 +25,47 @@ class IngestionPipeline:
         # Split into chunks
         chunks = self.chunker.split_text(text)
 
-        # Generate embeddings for all chunks
+        # Generate embeddings
         embeddings = self.embedding_model.encode(chunks)
 
-        return chunks, embeddings
+        # Create metadata
+        documents = []
+
+        for i, (chunk, embedding) in enumerate(
+            zip(chunks, embeddings), start=1
+        ):
+            documents.append(
+                {
+                    "chunk_id": i,
+                    "text": chunk,
+                    "embedding": embedding,
+                    "source": pdf_path
+                }
+            )
+
+        return documents
 
 
 if __name__ == "__main__":
 
     pipeline = IngestionPipeline()
 
-    chunks, embeddings = pipeline.process("sample.pdf")
+    documents = pipeline.process("sample.pdf")
 
-    print(f"\nTotal Chunks: {len(chunks)}")
-    print(f"Total Embeddings: {len(embeddings)}")
+    print(f"\nTotal Chunks: {len(documents)}")
 
-    if embeddings:
-        print(f"Embedding Dimension: {len(embeddings[0])}")
+    if documents:
+        print(
+            f"Embedding Dimension: "
+            f"{len(documents[0]['embedding'])}"
+        )
 
-    for i, chunk in enumerate(chunks, start=1):
-        print(f"\nChunk {i}")
-        print("-" * 40)
-        print(chunk)
+    for doc in documents:
+
+        print(f"\nChunk {doc['chunk_id']}")
+        print("-" * 50)
+        print(doc["text"])
+
+        print("\nMetadata")
+        print(f"Source : {doc['source']}")
+        print(f"Chunk ID : {doc['chunk_id']}")
