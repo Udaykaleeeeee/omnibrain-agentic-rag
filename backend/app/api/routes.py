@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 from ..ingestion import (
     ingest_document, 
@@ -219,14 +219,16 @@ def get_storage_stats():
 
 
 class QueryRequest(BaseModel):
-    question: str
-    document_id: Optional[str] = None
+
+    question: str = Field(..., description="Question to ask")
+    document_id: Optional[str] = Field(None, description="Specific document to search in")
 
 
 class QueryResponse(BaseModel):
-    question: str
-    answer: str
-    sources: list = []
+    
+    question: str = Field(..., description="The original question")
+    answer: str = Field(..., description="AI generated answer")
+    sources: list = Field(default=[], description="List of source documents used")
 
 
 @router.post("/query", response_model=QueryResponse)
@@ -243,14 +245,16 @@ async def query_documents(request: QueryRequest):
     )
 
 class MemoRequest(BaseModel):
-    document_id: str
-    focus_area: Optional[str] = None
+    
+    document_id: str = Field(..., description="ID of the document to generate memo for")
+    focus_area: Optional[str] = Field(None, description="Specific area to focus on in the memo")
 
 
 class MemoResponse(BaseModel):
-    document_id: str
-    memo: str
-    status: str
+    
+    document_id: str = Field(..., description="ID of the document")
+    memo: str = Field(..., description="Generated memo content")
+    status: str = Field(..., description="Status of memo generation")
 
 
 @router.post("/generate-memo", response_model=MemoResponse)
