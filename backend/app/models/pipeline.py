@@ -1,39 +1,41 @@
 from backend.app.ingestion.pdf_loader import PDFLoader
 from backend.app.models.chunking import TextChunker
 from backend.app.models.embeddings import TextEmbeddingModel
+from backend.app.models.image_embeddings import ImageEmbeddingModel
+from backend.app.models.image_index import ImageIndex
 
 
 class IngestionPipeline:
     """
-    Complete document ingestion pipeline.
+    Multi-modal document ingestion pipeline.
     """
 
     def __init__(self):
         self.loader = PDFLoader()
         self.chunker = TextChunker()
-        self.embedding_model = TextEmbeddingModel()
 
-    def process(self, pdf_path: str):
+        self.text_embedding_model = TextEmbeddingModel()
+        self.image_embedding_model = ImageEmbeddingModel()
+
+        self.image_index = ImageIndex()
+
+    def process(self, pdf_path: str, image_path: str = None):
         """
-        Load PDF, split into chunks, generate embeddings,
-        and return metadata for each chunk.
+        Process PDF and optional image.
         """
 
-        # Load PDF
+        # ---------- TEXT ----------
         text = self.loader.load(pdf_path)
 
-        # Split into chunks
         chunks = self.chunker.split_text(text)
 
-        # Generate embeddings
-        embeddings = self.embedding_model.encode(chunks)
+        embeddings = self.text_embedding_model.encode(chunks)
 
-        # Create metadata
         documents = []
 
         for i, (chunk, embedding) in enumerate(
-            zip(chunks, embeddings), start=1
-        ):
+                zip(chunks, embeddings), start=1):
+
             documents.append(
                 {
                     "chunk_id": i,
@@ -43,29 +45,47 @@ class IngestionPipeline:
                 }
             )
 
-        return documents
+        # ---------- IMAGE ----------
+
+        if image_path:
+
+            image_embedding = self.image_embedding_model.encode(image_path)[0]
+
+            self.image_index.add(
+                image_path,
+                image_embedding
+            )
+
+        return documents, self.image_index.get_all()
 
 
 if __name__ == "__main__":
 
     pipeline = IngestionPipeline()
 
-    documents = pipeline.process("sample.pdf")
+    documents, images = pipeline.process(
+        "sample.pdf",
+        "sample.jpg"
+    )
 
-    print(f"\nTotal Chunks: {len(documents)}")
+    print("\n========== TEXT ==========")
 
-    if documents:
+    print(f"Total Chunks: {len(documents)}")
+
+    print(
+        f"Embedding Dimension: "
+        f"{len(documents[0]['embedding'])}"
+    )
+
+    print("\n========== IMAGE ==========")
+
+    print(f"Indexed Images: {len(images)}")
+
+    if images:
+
+        print("Image:", images[0]["image_path"])
+
         print(
-            f"Embedding Dimension: "
-            f"{len(documents[0]['embedding'])}"
+            "Image Embedding Dimension:",
+            len(images[0]["embedding"])
         )
-
-    for doc in documents:
-
-        print(f"\nChunk {doc['chunk_id']}")
-        print("-" * 50)
-        print(doc["text"])
-
-        print("\nMetadata")
-        print(f"Source : {doc['source']}")
-        print(f"Chunk ID : {doc['chunk_id']}")
