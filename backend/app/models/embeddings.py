@@ -27,6 +27,8 @@ class TextEmbeddingModel:
 
         embeddings = self.model.encode(
             texts,
+            batch_size=16,
+            show_progress_bar=True,
             normalize_embeddings=True
         )
 
