@@ -215,3 +215,48 @@ def delete_document_endpoint(document_id: str):
 def get_storage_stats():
     """Get storage statistics."""
     return get_stats()
+
+
+
+class QueryRequest(BaseModel):
+    question: str
+    document_id: Optional[str] = None
+
+
+class QueryResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list = []
+
+
+@router.post("/query", response_model=QueryResponse)
+async def query_documents(request: QueryRequest):
+    """Ask a question and get an answer with sources"""
+    
+    return QueryResponse(
+        question=request.question,
+        answer="This is a placeholder answer. AI agent integration coming soon.",
+        sources=[]
+    )
+
+class MemoRequest(BaseModel):
+    document_id: str
+    focus_area: Optional[str] = None
+
+
+class MemoResponse(BaseModel):
+    document_id: str
+    memo: str
+    status: str
+
+
+@router.post("/generate-memo", response_model=MemoResponse)
+async def generate_memo(request: MemoRequest):
+    # abhi AI agent connect nahi hua hai, isliye dummy memo bhej rahe hain
+    dummy_memo = "This is a placeholder memo. Full report generation coming soon."
+    
+    return MemoResponse(
+        document_id=request.document_id,
+        memo=dummy_memo,
+        status="pending_ai_integration"
+    )
