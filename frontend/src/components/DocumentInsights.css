@@ -1,0 +1,149 @@
+.overview-grid{
+
+    display:grid;
+
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+
+    gap:22px;
+
+}
+
+.overview-card{
+
+    background:#f8fafc;
+
+    border:1px solid #e2e8f0;
+
+    border-radius:20px;
+
+    padding:30px;
+
+    text-align:center;
+
+    transition:.3s;
+
+}
+
+.overview-card:hover{
+
+    transform:translateY(-6px);
+
+    box-shadow:0 12px 28px rgba(15,23,42,.08);
+
+}
+
+.overview-card svg{
+
+    font-size:28px;
+
+    color:#2563eb;
+
+    margin-bottom:18px;
+
+}
+
+.overview-card h2{
+
+    font-size:28px;
+
+    color:#0f172a;
+
+    margin-bottom:10px;
+
+}
+
+.overview-card p{
+
+    color:#64748b;
+
+    font-size:15px;
+
+}
+
+/* ---------- AI Processing ---------- */
+
+.pipeline{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+    gap:15px;
+
+    flex-wrap:wrap;
+
+}
+
+.pipeline-step{
+
+    flex:1;
+
+    min-width:120px;
+
+    background:white;
+
+    border-radius:18px;
+
+    border:1px solid #dbeafe;
+
+    padding:20px;
+
+    text-align:center;
+
+    transition:.3s;
+
+}
+
+.pipeline-step:hover{
+
+    transform:translateY(-5px);
+
+    background:#eff6ff;
+
+}
+
+.pipeline-icon{
+
+    width:55px;
+
+    height:55px;
+
+    margin:auto;
+
+    border-radius:50%;
+
+    background:linear-gradient(135deg,#2563eb,#4f46e5);
+
+    color:white;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:22px;
+
+    margin-bottom:15px;
+
+}
+
+.pipeline-step h4{
+
+    font-size:16px;
+
+    color:#0f172a;
+
+}
+
+.pipeline-step p{
+
+    margin-top:8px;
+
+    color:#64748b;
+
+    font-size:13px;
+
+}

@@ -2,6 +2,8 @@ import { useRef, useState } from "react";
 import {
   FaCloudUploadAlt,
   FaFilePdf,
+  FaArrowRight,
+  FaCheckCircle,
 } from "react-icons/fa";
 
 import "./UploadSection.css";
@@ -23,7 +25,7 @@ function UploadSection() {
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setStatus("Please select a PDF first.");
+      setStatus("Please select a document first.");
       return;
     }
 
@@ -38,42 +40,81 @@ function UploadSection() {
       console.log(response.data);
 
       setStatus(response.data.message);
+
     } catch (error) {
+
       console.error(error);
 
       if (error.response) {
+
         setStatus("Upload failed.");
+
       } else {
+
         setStatus("Cannot connect to backend.");
+
       }
+
     } finally {
+
       setLoading(false);
+
     }
   };
 
   return (
-    <div className="upload-card card">
 
-      <h2>Document Upload</h2>
+    <section className="upload-card card fade">
 
-      <p className="upload-subtitle">
-        Securely upload your document and begin an AI-powered conversation instantly.
-      </p>
+      <div className="upload-header">
+
+        <h2>Upload Knowledge</h2>
+
+        <p>
+
+          Upload PDF, DOCX or TXT documents and let OmniBrain
+          transform them into an intelligent searchable knowledge base.
+
+        </p>
+
+      </div>
 
       <div
         className="drop-zone"
         onClick={() => fileInputRef.current.click()}
       >
 
-        <FaCloudUploadAlt className="cloud-icon" />
+        <div className="upload-icon">
 
-        <h3>Drag & Drop PDF Here</h3>
+          <FaCloudUploadAlt />
 
-        <p>or click to browse</p>
+        </div>
+
+        <h3>
+
+          Drag & Drop your document
+
+        </h3>
+
+        <p>
+
+          or click to browse from your computer
+
+        </p>
+
+        <div className="supported-tags">
+
+          <span>PDF</span>
+
+          <span>DOCX</span>
+
+          <span>TXT</span>
+
+        </div>
 
         <input
           type="file"
-          accept=".pdf"
+          accept=".pdf,.docx,.txt"
           hidden
           ref={fileInputRef}
           onChange={handleFileChange}
@@ -81,20 +122,52 @@ function UploadSection() {
 
       </div>
 
-      <div className="selected-file-card">
+      <div className="selected-card">
 
-        <h4>Selected File</h4>
+        <div>
 
-        {selectedFile ? (
-          <div className="file-name">
+          <h4>
 
-            <FaFilePdf />
+            Selected Document
 
-            <span>{selectedFile.name}</span>
+          </h4>
 
-          </div>
-        ) : (
-          <p>No file selected</p>
+          {selectedFile ? (
+
+            <div className="file-row">
+
+              <FaFilePdf />
+
+              <div>
+
+                <strong>{selectedFile.name}</strong>
+
+                <small>
+
+                  Ready for processing
+
+                </small>
+
+              </div>
+
+            </div>
+
+          ) : (
+
+            <p>
+
+              No document selected yet.
+
+            </p>
+
+          )}
+
+        </div>
+
+        {selectedFile && (
+
+          <FaCheckCircle className="success-icon" />
+
         )}
 
       </div>
@@ -104,14 +177,25 @@ function UploadSection() {
         onClick={handleUpload}
         disabled={loading}
       >
-        {loading ? "Uploading..." : "Upload PDF"}
+
+        {loading ? "Uploading..." : "Upload Document"}
+
+        {!loading && <FaArrowRight />}
+
       </button>
 
       {status && (
-        <p className="status">{status}</p>
+
+        <div className="upload-status">
+
+          {status}
+
+        </div>
+
       )}
 
-    </div>
+    </section>
+
   );
 }
 
