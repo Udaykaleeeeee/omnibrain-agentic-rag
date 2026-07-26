@@ -232,6 +232,9 @@ class QueryResponse(BaseModel):
 @router.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
     """Ask a question and get an answer with sources"""
+
+    if not request.question or request.question.strip() == "":
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
     
     return QueryResponse(
         question=request.question,
@@ -252,6 +255,9 @@ class MemoResponse(BaseModel):
 
 @router.post("/generate-memo", response_model=MemoResponse)
 async def generate_memo(request: MemoRequest):
+    if not request.document_id or request.document_id.strip() == "":
+        raise HTTPException(status_code=400, detail="Document ID cannot be empty")
+    
     # abhi AI agent connect nahi hua hai, isliye dummy memo bhej rahe hain
     dummy_memo = "This is a placeholder memo. Full report generation coming soon."
     
