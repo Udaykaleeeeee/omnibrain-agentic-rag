@@ -17,8 +17,11 @@ from ..ingestion.storage import (
     get_chunks,
     get_chunk,
     get_stats,
-    delete_document
+    delete_document,
+    get_images,
+    get_image
 )
+from ..ingestion.image_storage import delete_document_images
 from ..vector_db import RetrievalService, QdrantService
 
 logger = logging.getLogger(__name__)
@@ -35,6 +38,8 @@ class IngestResponse(BaseModel):
     total_pages: int
     ocr_pages_used: int
     chunks_created: int
+    images_extracted: Optional[int] = 0
+    metadata: Optional[Dict[str, Any]] = None
     status: str
     message: Optional[str] = None
 
@@ -114,6 +119,8 @@ async def ingest_document_endpoint(
             total_pages=result["total_pages"],
             ocr_pages_used=result["ocr_pages_used"],
             chunks_created=result["chunks_created"],
+            images_extracted=result.get("images_extracted", 0),
+            metadata=result.get("metadata"),
             status=result["status"],
             message=f"Successfully ingested {file.filename}"
         )
@@ -198,11 +205,46 @@ def get_specific_chunk(document_id: str, chunk_index: int):
     return chunk
 
 
+@router.get("/documents/{document_id}/images")
+def get_document_images(document_id: str):
+    """Get all extracted images metadata for a specific document."""
+    images = get_images(document_id)
+    
+    if images is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Document {document_id} not found"
+        )
+    
+    return {
+        "document_id": document_id,
+        "total_images": len(images),
+        "images": images
+    }
+
+
+@router.get("/documents/{document_id}/images/{image_index}")
+def get_specific_image(document_id: str, image_index: int):
+    """Get specific image metadata by index."""
+    image = get_image(document_id, image_index)
+    
+    if image is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Image {image_index} not found for document {document_id}"
+        )
+    
+    return image
+
+
 @router.delete("/documents/{document_id}")
 def delete_document_endpoint(document_id: str):
-    """Delete a document and all its chunks."""
+    """Delete a document and all its chunks and images."""
     success = delete_document(document_id)
     qdrant_service.delete_document(document_id)
+    
+    # Delete associated images from disk
+    deleted_images = delete_document_images(document_id)
     
     if not success:
         raise HTTPException(
@@ -211,7 +253,8 @@ def delete_document_endpoint(document_id: str):
         )
     
     return {
-        "message": f"Document {document_id} deleted successfully"
+        "message": f"Document {document_id} deleted successfully",
+        "images_deleted": deleted_images
     }
 
 
@@ -314,4 +357,4 @@ async def generate_memo(request: MemoRequest):
         document_id=request.document_id,
         memo=dummy_memo,
         status="pending_ai_integration"
-    )
+    )

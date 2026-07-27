@@ -12,7 +12,9 @@ from .preprocessing import (
     preprocess_text,
     detect_repeated_headers_footers,
     is_empty_or_garbage,
+    detect_language,
 )
+from .image_storage import save_image
 
 from ..models.chunking import TextChunker
 from ..models.embeddings import TextEmbeddingModel
@@ -110,6 +112,12 @@ class IngestionPipeline:
 
         doc.pages = processed_pages
         doc.total_pages = len(processed_pages)
+        
+        # Detect document language from combined text
+        all_text = "\n".join([p.text for p in doc.pages if p.text])
+        detected_lang = detect_language(all_text)
+        if detected_lang:
+            doc.metadata["detected_language"] = detected_lang
 
         return doc
 
@@ -148,7 +156,54 @@ class IngestionPipeline:
             f"Created {len(all_chunks)} chunks from {doc.total_pages} pages."
         )
 
-        return all_chunks   
+        return all_chunks
+    
+    def process_images(
+        self,
+        doc: ParsedDocument,
+        document_id: str,
+    ) -> List[dict]:
+        """
+        Extract, save, and catalog images from document.
+        Returns list of image metadata dicts.
+        """
+        image_metadata = []
+        
+        for page in doc.pages:
+            for img in page.images:
+                try:
+                    # Save image to disk
+                    image_path = save_image(
+                        image_bytes=img.image_bytes,
+                        document_id=document_id,
+                        page_number=img.page_number,
+                        image_index=img.image_index,
+                        image_format=img.format or "png"
+                    )
+                    
+                    # Build metadata record
+                    img_meta = {
+                        "document_id": document_id,
+                        "page_number": img.page_number,
+                        "image_index": img.image_index,
+                        "image_path": image_path,
+                        "width": img.width,
+                        "height": img.height,
+                        "format": img.format,
+                        "ocr_text": img.ocr_text,  # OCR text if available
+                        "bbox": None,  # Reserved for future bbox extraction
+                    }
+                    
+                    image_metadata.append(img_meta)
+                    
+                except Exception as e:
+                    logger.error(
+                        f"Failed to process image {img.image_index} "
+                        f"on page {img.page_number}: {e}"
+                    )
+        
+        logger.info(f"Processed {len(image_metadata)} images from document")
+        return image_metadata   
     def ingest_document(
         self,
         file_path: str,
@@ -180,6 +235,11 @@ class IngestionPipeline:
           chunks = self.chunk_document(doc)
 
         # -------------------------
+        # Process and save images
+        # -------------------------
+          images = self.process_images(doc, document_id)
+
+        # -------------------------
         # Generate embeddings
         # -------------------------
           chunk_texts = [chunk["text"] for chunk in chunks]
@@ -209,10 +269,11 @@ class IngestionPipeline:
             document_id,
             document_data,
             chunks,
+            images,  # Now storing images
         )
 
           logger.info(
-            f"Stored {len(chunks)} chunks in temporary storage."
+            f"Stored {len(chunks)} chunks and {len(images)} images in temporary storage."
         )
 
         # -------------------------
@@ -240,7 +301,9 @@ class IngestionPipeline:
             "total_pages": doc.total_pages,
             "ocr_pages_used": doc.ocr_pages_used,
             "chunks_created": len(chunks),
+            "images_extracted": len(images),
             "embeddings_created": len(embeddings),
+            "metadata": doc.metadata,
             "status": "success",
         } 
 def ingest_document(
