@@ -1,7 +1,7 @@
 import logging
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Union, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
@@ -19,10 +19,13 @@ from ..ingestion.storage import (
     get_stats,
     delete_document
 )
+from ..vector_db import RetrievalService, QdrantService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+retrieval_service = RetrievalService()
+qdrant_service = QdrantService()
 
 
 class IngestResponse(BaseModel):
@@ -199,6 +202,7 @@ def get_specific_chunk(document_id: str, chunk_index: int):
 def delete_document_endpoint(document_id: str):
     """Delete a document and all its chunks."""
     success = delete_document(document_id)
+    qdrant_service.delete_document(document_id)
     
     if not success:
         raise HTTPException(
@@ -214,30 +218,83 @@ def delete_document_endpoint(document_id: str):
 @router.get("/stats")
 def get_storage_stats():
     """Get storage statistics."""
-    return get_stats()
+    stats = get_stats()
+    stats["vector_count"] = qdrant_service.count_vectors()
+    return stats
 
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+    score_threshold: Optional[float] = None
+    document_id: Optional[Union[str, List[str]]] = None
+    filename: Optional[str] = None
+    source_format: Optional[str] = None
+    page_number: Optional[Union[int, List[int]]] = None
+    is_ocr: Optional[bool] = None
+    enable_hybrid: Optional[bool] = True
+
+
+@router.post("/search")
+async def search_documents(request: SearchRequest):
+    """
+    Semantic search & retrieval endpoint.
+    Returns top-k chunks, payload metadata, similarity scores, and formatted citations.
+    """
+    try:
+        results = retrieval_service.retrieve(
+            query=request.query,
+            top_k=request.top_k,
+            score_threshold=request.score_threshold,
+            document_id=request.document_id,
+            filename=request.filename,
+            source_format=request.source_format,
+            page_number=request.page_number,
+            is_ocr=request.is_ocr,
+            enable_hybrid=request.enable_hybrid,
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Search failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
 class QueryRequest(BaseModel):
     question: str
     document_id: Optional[str] = None
+    top_k: Optional[int] = 5
 
 
 class QueryResponse(BaseModel):
     question: str
     answer: str
     sources: list = []
+    rag_context: Optional[str] = None
 
 
 @router.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Ask a question and get an answer with sources"""
-    
-    return QueryResponse(
-        question=request.question,
-        answer="This is a placeholder answer. AI agent integration coming soon.",
-        sources=[]
-    )
+    """Ask a question and get retrieved relevant sources and citations"""
+    try:
+        retrieval_res = retrieval_service.retrieve(
+            query=request.question,
+            top_k=request.top_k or 5,
+            document_id=request.document_id,
+        )
+        return QueryResponse(
+            question=request.question,
+            answer="Retrieved relevant chunks. AI Agent synthesis ready.",
+            sources=retrieval_res["chunks"],
+            rag_context=retrieval_res["rag_context"],
+        )
+    except Exception as e:
+        logger.error(f"Query endpoint failed: {e}")
+        return QueryResponse(
+            question=request.question,
+            answer=f"Error executing retrieval: {str(e)}",
+            sources=[],
+        )
+
 
 class MemoRequest(BaseModel):
     document_id: str
@@ -252,11 +309,9 @@ class MemoResponse(BaseModel):
 
 @router.post("/generate-memo", response_model=MemoResponse)
 async def generate_memo(request: MemoRequest):
-    # abhi AI agent connect nahi hua hai, isliye dummy memo bhej rahe hain
     dummy_memo = "This is a placeholder memo. Full report generation coming soon."
-    
     return MemoResponse(
         document_id=request.document_id,
         memo=dummy_memo,
         status="pending_ai_integration"
-    )
+    )
