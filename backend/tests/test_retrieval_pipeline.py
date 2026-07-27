@@ -2,10 +2,14 @@
 Unit tests for QdrantService, CitationEngine, and RetrievalService (Member 3 - Vector DB & Retrieval)
 """
 
+import logging
 from backend.app.vector_db.qdrant_client import QdrantService
 from backend.app.vector_db.citation import CitationEngine
 from backend.app.vector_db.retrieval import RetrievalService
 from backend.app.models.embeddings import TextEmbeddingModel
+
+logger = logging.getLogger(__name__)
+
 
 
 
@@ -174,12 +178,12 @@ def test_retrieval_service_metadata_filtering():
 if __name__ == "__main__":
     print("Running Vector DB & Retrieval Pipeline Tests...")
     test_qdrant_service_in_memory()
-    print("✓ test_qdrant_service_in_memory passed")
+    print("[PASS] test_qdrant_service_in_memory passed")
     test_citation_engine()
-    print("✓ test_citation_engine passed")
+    print("[PASS] test_citation_engine passed")
     test_retrieval_service_clean_interface()
-    print("✓ test_retrieval_service_clean_interface passed")
+    print("[PASS] test_retrieval_service_clean_interface passed")
     test_retrieval_service_metadata_filtering()
-    print("✓ test_retrieval_service_metadata_filtering passed")
+    print("[PASS] test_retrieval_service_metadata_filtering passed")
     print("\nAll 4 tests completed successfully!")
 

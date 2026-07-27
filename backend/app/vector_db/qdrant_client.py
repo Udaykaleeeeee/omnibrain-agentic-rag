@@ -300,7 +300,7 @@ class QdrantService:
 
     def search(
         self,
-        query_embedding: List[float],
+        query_embedding: Optional[List[float]] = None,
         limit: int = 5,
         score_threshold: Optional[float] = None,
         document_ids: Optional[Union[str, List[str]]] = None,
@@ -310,10 +310,15 @@ class QdrantService:
         page_number: Optional[Union[int, List[int]]] = None,
         filter_dict: Optional[Dict[str, Any]] = None,
         query_filter: Optional[Filter] = None,
+        query_vector: Optional[List[float]] = None,
     ) -> List[Any]:
         """
         Search for similar vectors with top-k limit, metadata filtering, and score threshold.
         """
+        vector_to_search = query_embedding if query_embedding is not None else query_vector
+        if vector_to_search is None:
+            raise ValueError("Must provide either query_embedding or query_vector to QdrantService.search()")
+
         if query_filter is None:
             query_filter = self._build_filter(
                 document_ids=document_ids,
@@ -324,15 +329,25 @@ class QdrantService:
                 extra_filters=filter_dict,
             )
 
-        results = self.client.search(
-            collection_name=self.collection_name,
-            query_vector=query_embedding,
-            limit=limit,
-            query_filter=query_filter,
-            score_threshold=score_threshold,
-        )
-
-        return results
+        if hasattr(self.client, "search"):
+            return self.client.search(
+                collection_name=self.collection_name,
+                query_vector=vector_to_search,
+                limit=limit,
+                query_filter=query_filter,
+                score_threshold=score_threshold,
+            )
+        elif hasattr(self.client, "query_points"):
+            res = self.client.query_points(
+                collection_name=self.collection_name,
+                query=vector_to_search,
+                limit=limit,
+                query_filter=query_filter,
+                score_threshold=score_threshold,
+            )
+            return res.points
+        else:
+            raise RuntimeError("QdrantClient object has neither 'search' nor 'query_points' method.")
 
     def search_images(
         self,
@@ -355,15 +370,25 @@ class QdrantService:
                 ]
             )
 
-        results = self.client.search(
-            collection_name=self.image_collection_name,
-            query_vector=query_embedding,
-            limit=limit,
-            query_filter=query_filter,
-            score_threshold=score_threshold,
-        )
-
-        return results
+        if hasattr(self.client, "search"):
+            return self.client.search(
+                collection_name=self.image_collection_name,
+                query_vector=query_embedding,
+                limit=limit,
+                query_filter=query_filter,
+                score_threshold=score_threshold,
+            )
+        elif hasattr(self.client, "query_points"):
+            res = self.client.query_points(
+                collection_name=self.image_collection_name,
+                query=query_embedding,
+                limit=limit,
+                query_filter=query_filter,
+                score_threshold=score_threshold,
+            )
+            return res.points
+        else:
+            return []
 
     def delete_document(self, document_id: str) -> bool:
         """
