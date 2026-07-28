@@ -39,25 +39,21 @@ function UploadSection() {
 
       console.log(response.data);
 
-      setStatus(response.data.message);
+      setStatus("Document uploaded successfully!");
 
     } catch (error) {
 
-      console.error(error);
+        console.error("ERROR:", error);
+        console.error("Response:", error.response);
+        console.error("Request:", error.request);
 
-      if (error.response) {
-
-        setStatus("Upload failed.");
-
-      } else {
-
-        setStatus("Cannot connect to backend.");
-
-      }
-
-    } finally {
-
-      setLoading(false);
+        if (error.response) {
+          console.log("Backend Error Data:", error.response.data);
+          setStatus("Upload failed.");
+        } else {
+          setStatus("Cannot connect to backend.");
+        }
+      } finally {
 
     }
   };
@@ -196,7 +192,7 @@ function UploadSection() {
 
     </section>
 
-  );
+  ); 
 }
 
 export default UploadSection;
