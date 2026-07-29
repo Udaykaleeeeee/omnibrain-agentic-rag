@@ -6,10 +6,14 @@ Multi-format document ingestion system with OCR support for RAG applications.
 
 - ✅ **Multi-format Support**: PDF, DOCX, TXT
 - ✅ **OCR Integration**: Tesseract for scanned documents
-- ✅ **Text Processing**: Normalization, chunking, preprocessing
-- ✅ **Image Extraction**: From PDF and DOCX files
+- ✅ **Image Extraction & Storage**: Extract and save images from PDFs with metadata
+- ✅ **Text Processing**: Advanced normalization, encoding fixes, chunking, preprocessing
+- ✅ **Language Detection**: Automatic language identification per document
+- ✅ **Metadata Extraction**: Native file metadata (title, author, dates, keywords)
+- ✅ **Vector Embeddings**: Sentence-transformers integration
+- ✅ **Vector Database**: Qdrant for semantic search
 - ✅ **REST API**: FastAPI with automatic documentation
-- ✅ **Data Retrieval**: Full CRUD operations for documents and chunks
+- ✅ **Data Retrieval**: Full CRUD operations for documents, chunks, and images
 
 ## Quick Start
 
@@ -69,6 +73,13 @@ Response:
   "total_pages": 5,
   "ocr_pages_used": 0,
   "chunks_created": 12,
+  "images_extracted": 3,
+  "metadata": {
+    "title": "Sample Document",
+    "author": "John Doe",
+    "detected_language": "en",
+    "creation_date": "2024-01-15"
+  },
   "status": "success"
 }
 ```
@@ -95,12 +106,22 @@ curl http://127.0.0.1:8000/documents/doc-001/chunks
 curl http://127.0.0.1:8000/documents/doc-001/chunks/0
 ```
 
+**GET /documents/{id}/images** - Get all extracted images
+```bash
+curl http://127.0.0.1:8000/documents/doc-001/images
+```
+
+**GET /documents/{id}/images/{index}** - Get specific image metadata
+```bash
+curl http://127.0.0.1:8000/documents/doc-001/images/0
+```
+
 **GET /stats** - Get storage statistics
 ```bash
 curl http://127.0.0.1:8000/stats
 ```
 
-**DELETE /documents/{id}** - Delete document
+**DELETE /documents/{id}** - Delete document and associated images
 ```bash
 curl -X DELETE http://127.0.0.1:8000/documents/doc-001
 ```
@@ -110,6 +131,22 @@ curl -X DELETE http://127.0.0.1:8000/documents/doc-001
 **GET /ingest/formats** - List supported formats
 ```bash
 curl http://127.0.0.1:8000/ingest/formats
+```
+
+### Search
+
+**POST /search** - Semantic search across documents
+```bash
+curl -X POST "http://127.0.0.1:8000/search" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "your search query", "top_k": 5}'
+```
+
+**POST /query** - Ask questions and get context
+```bash
+curl -X POST "http://127.0.0.1:8000/query" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "What is this document about?"}'
 ```
 
 ## Python Usage
@@ -126,11 +163,26 @@ with open("document.pdf", "rb") as f:
     )
     result = response.json()
     print(f"Created {result['chunks_created']} chunks")
+    print(f"Extracted {result['images_extracted']} images")
+    print(f"Detected language: {result['metadata'].get('detected_language')}")
 
 # Retrieve chunks
 response = requests.get("http://127.0.0.1:8000/documents/doc-001/chunks")
 chunks = response.json()
 print(f"Total chunks: {chunks['total_chunks']}")
+
+# Retrieve images
+response = requests.get("http://127.0.0.1:8000/documents/doc-001/images")
+images = response.json()
+print(f"Total images: {images['total_images']}")
+
+# Semantic search
+response = requests.post(
+    "http://127.0.0.1:8000/search",
+    json={"query": "machine learning", "top_k": 5}
+)
+results = response.json()
+print(f"Found {len(results['chunks'])} relevant chunks")
 ```
 
 ## Architecture
@@ -148,11 +200,16 @@ backend/
 │   │   ├── docx_parser.py   # DOCX parsing
 │   │   ├── txt_parser.py    # TXT parsing
 │   │   ├── ocr.py           # OCR integration
-│   │   ├── preprocessing.py # Text cleaning
+│   │   ├── preprocessing.py # Text cleaning & language detection
 │   │   ├── pipeline.py      # Main pipeline
-│   │   └── storage.py       # Data storage
-│   └── models/
-│       └── chunking.py      # Text chunking
+│   │   ├── storage.py       # Data storage
+│   │   └── image_storage.py # Image file management
+│   ├── models/
+│   │   ├── chunking.py      # Text chunking
+│   │   ├── embeddings.py    # Vector embeddings
+│   │   └── pipeline.py      # ML pipeline
+│   └── vector_db/
+│       └── qdrant_client.py # Vector database
 ```
 
 ## Processing Pipeline
@@ -164,13 +221,25 @@ Format Detection
     ↓
 Parser (PDF/DOCX/TXT)
     ↓
+Image Extraction & Storage
+    ↓
 OCR (if needed)
     ↓
 Text Preprocessing
+    ├── Encoding fixes (mojibake)
+    ├── Whitespace normalization
+    ├── De-hyphenation
+    └── Header/footer removal
+    ↓
+Language Detection
     ↓
 Chunking (500 chars, 100 overlap)
     ↓
-Storage (in-memory)
+Embedding Generation
+    ↓
+Vector Storage (Qdrant)
+    ↓
+Metadata Storage (in-memory)
     ↓
 Response with metadata
 ```
@@ -188,30 +257,37 @@ Response with metadata
 
 ### Preprocessing
 - Unicode normalization (NFKC)
-- Whitespace cleaning
+- Encoding fixes (handles mojibake: â€™→', Ã©→é, etc.)
+- Whitespace cleaning (removes zero-width spaces)
 - De-hyphenation
 - Header/footer removal
 - Empty page filtering
+- Language detection (ISO 639-1 codes)
 
 ## Supported Formats
 
-| Format | Extension | MIME Type | OCR Support |
-|--------|-----------|-----------|-------------|
-| PDF | .pdf | application/pdf | ✅ |
-| Word | .docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document | ✅ |
-| Text | .txt | text/plain | N/A |
+| Format | Extension | MIME Type | OCR Support | Image Extraction |
+|--------|-----------|-----------|-------------|------------------|
+| PDF | .pdf | application/pdf | ✅ | ✅ |
+| Word | .docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document | ✅ | ✅ |
+| Text | .txt | text/plain | N/A | N/A |
 
 ## Storage
 
-**Current**: In-memory storage (development)
-- ⚠️ Data lost on server restart
-- ✅ Fast and simple
-- ✅ Good for testing
+**Current Implementation**:
+- **In-memory storage**: Document metadata and chunks (temporary, fast)
+- **Vector database**: Qdrant for embeddings and semantic search
+- **Image storage**: Disk-based (`backend/uploads/images/`)
+- **Naming convention**: `{doc_id}_p{page:04d}_img{index:03d}.{ext}`
 
-**Future**: Vector database (production)
-- Qdrant for vector storage
-- Embeddings for similarity search
-- Persistent storage
+⚠️ **Note**: In-memory data is lost on server restart (development mode)
+
+**Features**:
+- ✅ Fast retrieval
+- ✅ Full metadata tracking
+- ✅ Persistent image storage
+- ✅ Vector similarity search
+- ✅ Semantic retrieval
 
 ## Development
 
@@ -232,6 +308,10 @@ omnibrain-agentic-rag/
 - **python-docx**: DOCX parsing
 - **pytesseract**: OCR integration
 - **pillow**: Image processing
+- **chardet**: Encoding detection
+- **langdetect**: Language identification
+- **sentence-transformers**: Vector embeddings
+- **qdrant-client**: Vector database
 
 ### Running Tests
 
@@ -247,7 +327,7 @@ Test with Swagger UI:
 1. **Replace in-memory storage** with persistent database:
    - SQLite for small-scale
    - PostgreSQL for production
-   - Qdrant for vector search
+   - Qdrant for vector search (already integrated)
 
 2. **Add authentication/authorization**
 
@@ -256,6 +336,49 @@ Test with Swagger UI:
 4. **Set up monitoring/logging**
 
 5. **Add rate limiting**
+
+6. **Configure image storage**:
+   - Use S3/MinIO for cloud storage
+   - Set up CDN for image delivery
+   - Configure backup strategy
+
+## New Features (v2.0.0)
+
+### 1. Image Extraction & Storage
+- **Automatic extraction** of embedded images from PDF and DOCX
+- **Persistent storage** on disk with structured naming
+- **Metadata tracking**: page number, dimensions, format, OCR text
+- **Separate OCR**: Images have their own OCR text (not merged into page text)
+- **API access**: Retrieve image metadata via REST endpoints
+
+**Image naming**: `{doc_id}_p{page:04d}_img{index:03d}.{ext}`  
+**Storage path**: `backend/uploads/images/`
+
+### 2. Enhanced Text Preprocessing
+- **Encoding fixes**: Automatically corrects mojibake (â€™→', Ã©→é, etc.)
+- **Enhanced whitespace**: Removes zero-width spaces and invisible Unicode
+- **Language detection**: Identifies document language (ISO 639-1 codes)
+- **Backward compatible**: All existing preprocessing preserved
+
+**Supported encodings**: UTF-8, Latin-1, Windows-1252, and auto-detection via chardet
+
+### 3. Improved Metadata Extraction
+- **PDF metadata**: Title, author, subject, keywords, dates, creator, producer
+- **DOCX metadata**: Title, author, subject, keywords, created/modified dates
+- **TXT metadata**: File size, encoding, timestamps
+- **Auto-detected**: Language code stored in metadata
+- **API exposure**: All metadata available in document details endpoint
+
+**Example metadata**:
+```json
+{
+  "title": "Research Paper",
+  "author": "John Doe",
+  "created": "2024-01-15",
+  "detected_language": "en",
+  "keywords": "AI, machine learning"
+}
+```
 
 ## Troubleshooting
 
@@ -291,30 +414,40 @@ pip install -r requirements.txt --force-reinstall
 | DOCX parsing | 0.5-1s/page | Fast |
 | PDF parsing | 1-2s/page | Text extraction |
 | PDF OCR | 3-5s/page | Tesseract processing |
+| Image extraction | <0.5s/image | Includes disk write |
+| Language detection | <0.1s | First 1000 chars |
 | Chunking | <0.1s | Fast |
+| Embedding generation | 0.1-0.5s/chunk | GPU accelerated |
+| Vector storage | <0.1s/batch | Qdrant optimized |
 
 ## Limitations
 
-- **In-memory storage**: Not persistent (development only)
-- **No embeddings**: Requires integration
-- **No vector search**: Requires vector DB
+- **In-memory metadata**: Not persistent for document/chunk metadata (images are saved to disk)
 - **Single server**: No distributed processing
+- **Language detection**: Requires text length >50 chars for accuracy
+- **Image OCR**: Separate from page OCR (not merged into main text)
 
 ## Next Steps
 
-1. **Embedding Generation**
-   - Integrate sentence-transformers
-   - Generate vectors for chunks
+1. **Enhanced Image Analysis**
+   - Bounding box extraction from PDFs
+   - Image classification
+   - Visual embeddings
 
-2. **Vector Database**
-   - Set up Qdrant
-   - Store embeddings
-   - Enable similarity search
+2. **Production Storage**
+   - PostgreSQL for metadata
+   - S3/MinIO for images
+   - Redis for caching
 
 3. **Multi-Agent System**
    - Search agent for retrieval
    - Vision agent for images
    - SQL agent for structured data
+
+4. **Advanced Features**
+   - Multi-language OCR
+   - Table extraction
+   - Formula recognition
 
 ## Contributing
 
@@ -326,12 +459,24 @@ This is a production-ready ingestion module for the OmniBrain RAG system.
 
 ## Status
 
-✅ **Production Ready** for ingestion and retrieval
-⏳ **In Development** for vector search and embeddings
+✅ **Production Ready**:
+- Document ingestion (PDF, DOCX, TXT)
+- Image extraction and storage
+- Language detection
+- Metadata extraction
+- Vector embeddings
+- Semantic search
+- Full CRUD API
+
+⏳ **In Development**:
+- Bounding box extraction
+- Visual embeddings
+- Multi-language support
+- Advanced analytics
 
 ---
 
-**Last Updated**: 2026-07-20
-**Version**: 1.0.0
+**Last Updated**: 2026-07-22
+**Version**: 2.0.0
 **Server**: http://127.0.0.1:8000
 **Docs**: http://127.0.0.1:8000/docs
