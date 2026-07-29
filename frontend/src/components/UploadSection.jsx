@@ -2,9 +2,10 @@ import { useRef, useState } from "react";
 import {
   FaCloudUploadAlt,
   FaFilePdf,
-  FaArrowRight,
   FaCheckCircle,
 } from "react-icons/fa";
+import { ClipLoader } from "react-spinners";
+import { toast } from "react-toastify";
 
 import "./UploadSection.css";
 import { uploadDocument } from "../services/api";
@@ -13,19 +14,33 @@ function UploadSection() {
   const fileInputRef = useRef(null);
 
   const [selectedFile, setSelectedFile] = useState(null);
-  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState("");
+  const [uploadResult, setUploadResult] = useState(null);
 
-  const handleFileChange = (e) => {
-    if (e.target.files.length > 0) {
-      setSelectedFile(e.target.files[0]);
-      setStatus("");
-    }
+  // -------------------------
+  // File Selection
+  // -------------------------
+
+  const handleFileChange = (event) => {
+    if (!event.target.files.length) return;
+
+    const file = event.target.files[0];
+
+    setSelectedFile(file);
+    setUploadResult(null);
+    setProgress(0);
+    setStatus("");
   };
+
+  // -------------------------
+  // Upload
+  // -------------------------
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setStatus("Please select a document first.");
+      toast.error("Please select a document.");
       return;
     }
 
@@ -34,143 +49,149 @@ function UploadSection() {
 
     try {
       setLoading(true);
+      setProgress(0);
+      setStatus("");
 
-      const response = await uploadDocument(formData);
+      const response = await uploadDocument(
+        formData,
+        (progressEvent) => {
+          if (!progressEvent.total) return;
 
-      console.log(response.data);
+          const percent = Math.round(
+            (progressEvent.loaded * 100) /
+              progressEvent.total
+          );
+
+          setProgress(percent);
+        }
+      );
+
+      setUploadResult(response.data);
 
       setStatus(response.data.message);
 
-    } catch (error) {
+      toast.success("Document uploaded successfully!");
 
+    } catch (error) {
       console.error(error);
 
       if (error.response) {
 
-        setStatus("Upload failed.");
+        const detail = error.response.data.detail;
+
+        if (typeof detail === "string") {
+          setStatus(detail);
+          toast.error(detail);
+        } else if (detail?.error) {
+          setStatus(detail.error);
+          toast.error(detail.error);
+        } else {
+          setStatus("Upload failed.");
+          toast.error("Upload failed.");
+        }
 
       } else {
-
         setStatus("Cannot connect to backend.");
-
+        toast.error("Backend unavailable.");
       }
 
     } finally {
-
       setLoading(false);
-
     }
   };
 
-  return (
-
-    <section className="upload-card card fade">
+    return (
+    <div className="upload-card card">
 
       <div className="upload-header">
 
-        <h2>Upload Knowledge</h2>
+        <h2>Document Upload</h2>
 
         <p>
-
-          Upload PDF, DOCX or TXT documents and let OmniBrain
-          transform them into an intelligent searchable knowledge base.
-
+          Upload PDF, DOCX or TXT files to start AI-powered document ingestion.
         </p>
 
       </div>
+
+      {/* Upload Area */}
 
       <div
         className="drop-zone"
         onClick={() => fileInputRef.current.click()}
       >
 
-        <div className="upload-icon">
+        <FaCloudUploadAlt className="cloud-icon" />
 
-          <FaCloudUploadAlt />
+        <h3>Drag & Drop your document</h3>
 
-        </div>
+        <p>or click to browse</p>
 
-        <h3>
-
-          Drag & Drop your document
-
-        </h3>
-
-        <p>
-
-          or click to browse from your computer
-
-        </p>
-
-        <div className="supported-tags">
-
-          <span>PDF</span>
-
-          <span>DOCX</span>
-
-          <span>TXT</span>
-
-        </div>
+        <span className="supported-text">
+          Supported: PDF • DOCX • TXT
+        </span>
 
         <input
+          ref={fileInputRef}
           type="file"
           accept=".pdf,.docx,.txt"
           hidden
-          ref={fileInputRef}
           onChange={handleFileChange}
         />
 
       </div>
 
-      <div className="selected-card">
+      {/* Selected File */}
 
-        <div>
+      <div className="selected-file-card">
 
-          <h4>
+        <h4>Selected File</h4>
 
-            Selected Document
+        {selectedFile ? (
 
-          </h4>
+          <div className="file-name">
 
-          {selectedFile ? (
+            <FaFilePdf />
 
-            <div className="file-row">
+            <span>{selectedFile.name}</span>
 
-              <FaFilePdf />
+          </div>
 
-              <div>
+        ) : (
 
-                <strong>{selectedFile.name}</strong>
-
-                <small>
-
-                  Ready for processing
-
-                </small>
-
-              </div>
-
-            </div>
-
-          ) : (
-
-            <p>
-
-              No document selected yet.
-
-            </p>
-
-          )}
-
-        </div>
-
-        {selectedFile && (
-
-          <FaCheckCircle className="success-icon" />
+          <p>No file selected</p>
 
         )}
 
       </div>
+
+      {/* Upload Progress */}
+
+      {loading && (
+
+        <div className="progress-wrapper">
+
+          <div className="progress-top">
+
+            <span>Uploading...</span>
+
+            <span>{progress}%</span>
+
+          </div>
+
+          <div className="progress-bar">
+
+            <div
+              className="progress-fill"
+              style={{ width: `${progress}%` }}
+            ></div>
+
+          </div>
+
+        </div>
+
+      )}
+
+      {/* Upload Button */}
 
       <button
         className="upload-button"
@@ -178,15 +199,32 @@ function UploadSection() {
         disabled={loading}
       >
 
-        {loading ? "Uploading..." : "Upload Document"}
+        {loading ? (
 
-        {!loading && <FaArrowRight />}
+          <>
+
+            <ClipLoader
+              color="#ffffff"
+              size={18}
+            />
+
+            Uploading...
+
+          </>
+
+        ) : (
+
+          "Upload Document"
+
+        )}
 
       </button>
 
+      {/* Status */}
+
       {status && (
 
-        <div className="upload-status">
+        <div className="status-message">
 
           {status}
 
@@ -194,9 +232,79 @@ function UploadSection() {
 
       )}
 
-    </section>
+      {/* Success Card */}
 
+      {uploadResult && (
+
+        <div className="success-card">
+
+          <div className="success-title">
+
+            <FaCheckCircle />
+
+            <span>Document Uploaded Successfully</span>
+
+          </div>
+
+          <div className="success-grid">
+
+            <div>
+
+              <label>Filename</label>
+
+              <p>{uploadResult.filename}</p>
+
+            </div>
+
+            <div>
+
+              <label>Pages</label>
+
+              <p>{uploadResult.total_pages}</p>
+
+            </div>
+
+            <div>
+
+              <label>Chunks Created</label>
+
+              <p>{uploadResult.chunks_created}</p>
+
+            </div>
+
+            <div>
+
+              <label>OCR Pages</label>
+
+              <p>{uploadResult.ocr_pages_used}</p>
+
+            </div>
+
+            <div>
+
+              <label>Format</label>
+
+              <p>{uploadResult.source_format}</p>
+
+            </div>
+
+            <div>
+
+              <label>Status</label>
+
+              <p>{uploadResult.status}</p>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+    </div>
   );
+
 }
 
 export default UploadSection;

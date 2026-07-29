@@ -1,14 +1,14 @@
 import logging
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Union, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
-from pydantic import BaseModel,Field
+from pydantic import BaseModel, Field
 
 from ..ingestion import (
-    ingest_document, 
-    is_supported_format, 
+    ingest_document,
+    is_supported_format,
     get_supported_extensions
 )
 from ..ingestion.storage import (
@@ -19,10 +19,13 @@ from ..ingestion.storage import (
     get_stats,
     delete_document
 )
+from ..vector_db import RetrievalService, QdrantService
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+retrieval_service = RetrievalService()
+qdrant_service = QdrantService()
 
 
 class IngestResponse(BaseModel):
@@ -64,7 +67,7 @@ async def ingest_document_endpoint(
     """Upload and ingest a document (PDF, DOCX, or TXT)."""
     if not document_id:
         document_id = str(uuid.uuid4())
-    
+
     if not is_supported_format(file.filename, file.content_type):
         raise HTTPException(
             status_code=400,
@@ -75,19 +78,19 @@ async def ingest_document_endpoint(
                 "supported_formats": get_supported_extensions()
             }
         )
-    
+
     upload_dir = Path("temp_uploads")
     upload_dir.mkdir(exist_ok=True)
-    
+
     temp_file_path = upload_dir / f"{document_id}_{file.filename}"
-    
+
     try:
         with open(temp_file_path, "wb") as f:
             content = await file.read()
             f.write(content)
-        
+
         logger.info(f"Processing document: {file.filename} ({document_id})")
-        
+
         result = ingest_document(
             file_path=str(temp_file_path),
             filename=file.filename,
@@ -98,12 +101,12 @@ async def ingest_document_endpoint(
             remove_headers_footers=remove_headers_footers,
             skip_empty_pages=skip_empty_pages
         )
-        
+
         logger.info(
             f"Successfully ingested {file.filename}: "
             f"{result['total_pages']} pages, {result['ocr_pages_used']} OCR pages"
         )
-        
+
         return IngestResponse(
             document_id=result["document_id"],
             filename=result["filename"],
@@ -114,22 +117,22 @@ async def ingest_document_endpoint(
             status=result["status"],
             message=f"Successfully ingested {file.filename}"
         )
-    
+
     except ValueError as e:
         logger.error(f"Validation error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    
+
     except FileNotFoundError as e:
         logger.error(f"File not found: {e}")
         raise HTTPException(status_code=404, detail=str(e))
-    
+
     except Exception as e:
         logger.error(f"Ingestion failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Document ingestion failed: {str(e)}"
         )
-    
+
     finally:
         try:
             if temp_file_path.exists():
@@ -153,13 +156,13 @@ def list_documents():
 def get_document_details(document_id: str):
     """Get details for a specific document."""
     document = get_document(document_id)
-    
+
     if not document:
         raise HTTPException(
             status_code=404,
             detail=f"Document {document_id} not found"
         )
-    
+
     return document
 
 
@@ -167,13 +170,13 @@ def get_document_details(document_id: str):
 def get_document_chunks(document_id: str):
     """Get all chunks for a specific document."""
     chunks = get_chunks(document_id)
-    
+
     if chunks is None:
         raise HTTPException(
             status_code=404,
             detail=f"Document {document_id} not found"
         )
-    
+
     return {
         "document_id": document_id,
         "total_chunks": len(chunks),
@@ -185,13 +188,13 @@ def get_document_chunks(document_id: str):
 def get_specific_chunk(document_id: str, chunk_index: int):
     """Get a specific chunk by index."""
     chunk = get_chunk(document_id, chunk_index)
-    
+
     if chunk is None:
         raise HTTPException(
             status_code=404,
             detail=f"Chunk {chunk_index} not found for document {document_id}"
         )
-    
+
     return chunk
 
 
@@ -199,13 +202,14 @@ def get_specific_chunk(document_id: str, chunk_index: int):
 def delete_document_endpoint(document_id: str):
     """Delete a document and all its chunks."""
     success = delete_document(document_id)
-    
+    qdrant_service.delete_document(document_id)
+
     if not success:
         raise HTTPException(
             status_code=404,
             detail=f"Document {document_id} not found"
         )
-    
+
     return {
         "message": f"Document {document_id} deleted successfully"
     }
@@ -214,44 +218,94 @@ def delete_document_endpoint(document_id: str):
 @router.get("/stats")
 def get_storage_stats():
     """Get storage statistics."""
-    return get_stats()
+    stats = get_stats()
+    stats["vector_count"] = qdrant_service.count_vectors()
+    return stats
 
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: Optional[int] = 5
+    score_threshold: Optional[float] = None
+    document_id: Optional[Union[str, List[str]]] = None
+    filename: Optional[str] = None
+    source_format: Optional[str] = None
+    page_number: Optional[Union[int, List[int]]] = None
+    is_ocr: Optional[bool] = None
+    enable_hybrid: Optional[bool] = True
+
+
+@router.post("/search")
+async def search_documents(request: SearchRequest):
+    """
+    Semantic search & retrieval endpoint.
+    Returns top-k chunks, payload metadata, similarity scores, and formatted citations.
+    """
+    try:
+        results = retrieval_service.retrieve(
+            query=request.query,
+            top_k=request.top_k,
+            score_threshold=request.score_threshold,
+            document_id=request.document_id,
+            filename=request.filename,
+            source_format=request.source_format,
+            page_number=request.page_number,
+            is_ocr=request.is_ocr,
+            enable_hybrid=request.enable_hybrid,
+        )
+        return results
+    except Exception as e:
+        logger.error(f"Search failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
 class QueryRequest(BaseModel):
-
     question: str = Field(..., description="Question to ask")
     document_id: Optional[str] = Field(None, description="Specific document to search in")
+    top_k: Optional[int] = Field(5, description="Number of top matching chunks to retrieve")
 
 
 class QueryResponse(BaseModel):
-    
     question: str = Field(..., description="The original question")
     answer: str = Field(..., description="AI generated answer")
     sources: list = Field(default=[], description="List of source documents used")
+    rag_context: Optional[str] = Field(None, description="Retrieved context used for the answer")
 
 
 @router.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Ask a question and get an answer with sources"""
+    """Ask a question and get retrieved relevant sources and citations"""
 
     if not request.question or request.question.strip() == "":
         raise HTTPException(status_code=400, detail="Question cannot be empty")
-    
-    return QueryResponse(
-        question=request.question,
-        answer="This is a placeholder answer. AI agent integration coming soon.",
-        sources=[]
-    )
+
+    try:
+        retrieval_res = retrieval_service.retrieve(
+            query=request.question,
+            top_k=request.top_k or 5,
+            document_id=request.document_id,
+        )
+        return QueryResponse(
+            question=request.question,
+            answer="Retrieved relevant chunks. AI Agent synthesis ready.",
+            sources=retrieval_res["chunks"],
+            rag_context=retrieval_res["rag_context"],
+        )
+    except Exception as e:
+        logger.error(f"Query endpoint failed: {e}")
+        return QueryResponse(
+            question=request.question,
+            answer=f"Error executing retrieval: {str(e)}",
+            sources=[],
+        )
+
 
 class MemoRequest(BaseModel):
-    
     document_id: str = Field(..., description="ID of the document to generate memo for")
     focus_area: Optional[str] = Field(None, description="Specific area to focus on in the memo")
 
 
 class MemoResponse(BaseModel):
-    
     document_id: str = Field(..., description="ID of the document")
     memo: str = Field(..., description="Generated memo content")
     status: str = Field(..., description="Status of memo generation")
@@ -261,10 +315,8 @@ class MemoResponse(BaseModel):
 async def generate_memo(request: MemoRequest):
     if not request.document_id or request.document_id.strip() == "":
         raise HTTPException(status_code=400, detail="Document ID cannot be empty")
-    
-    # abhi AI agent connect nahi hua hai, isliye dummy memo bhej rahe hain
+
     dummy_memo = "This is a placeholder memo. Full report generation coming soon."
-    
     return MemoResponse(
         document_id=request.document_id,
         memo=dummy_memo,

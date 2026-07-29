@@ -1,4 +1,7 @@
 import "./App.css";
+import "react-toastify/dist/ReactToastify.css";
+
+import { ToastContainer } from "react-toastify";
 
 import Navbar from "./components/Navbar";
 import Header from "./components/Header";
@@ -38,6 +41,17 @@ function App() {
         </section>
 
       </div>
+
+      <ToastContainer
+        position="top-right"
+        autoClose={3000}
+        newestOnTop
+        closeOnClick
+        pauseOnHover
+        draggable
+        theme="light"
+      />
+
     </div>
   );
 }
