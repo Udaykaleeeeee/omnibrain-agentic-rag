@@ -1,88 +1,120 @@
+import { useEffect, useState } from "react";
 import "./RecentDocuments.css";
-
 import {
   FaFilePdf,
   FaArrowRight,
   FaClock,
 } from "react-icons/fa";
 
-function RecentDocuments() {
+import { getDocuments } from "../services/api";
 
-  const documents = [
-    {
-      name: "Resume.pdf",
-      pages: 14,
-      time: "2 mins ago",
-      status: "Ready",
-    },
-    {
-      name: "Research Paper.pdf",
-      pages: 28,
-      time: "Yesterday",
-      status: "Processing",
-    },
-  ];
+function RecentDocuments({
+  selectedDocument,
+  setSelectedDocument,
+}) {
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDocuments = async () => {
+    try {
+      const response = await getDocuments();
+
+      const docs = response.data.documents || [];
+
+      setDocuments(docs);
+
+      // Automatically select the first document
+      if (docs.length > 0 && !selectedDocument) {
+        setSelectedDocument(docs[0]);
+      }
+
+    } catch (error) {
+      console.error("Failed to fetch documents:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDocuments();
+  }, []);
 
   return (
-
     <section className="recent-documents card fade">
 
       <div className="recent-header">
 
         <div>
-
-          <h2>
-
-            Recent Documents
-
-          </h2>
-
-          <p>
-
-            Recently processed knowledge sources.
-
-          </p>
-
+          <h2>Recent Documents</h2>
+          <p>Recently processed knowledge sources.</p>
         </div>
 
         <button>
-
           View All
-
           <FaArrowRight />
-
         </button>
 
       </div>
 
-      <div className="document-list">
+      {loading ? (
 
-        {documents.map((doc, index) => (
+        <div className="empty-state">
+          Loading documents...
+        </div>
 
-          <div
-            className="document-card"
-            key={index}
-          >
+      ) : documents.length === 0 ? (
 
-            <div className="document-left">
+        <div className="empty-state">
+          No documents uploaded yet.
+        </div>
 
-              <div className="pdf-icon">
+      ) : (
 
-                <FaFilePdf />
+        <div className="document-list">
+
+          {documents.map((doc) => (
+
+            <div
+              key={doc.document_id}
+              onClick={() => setSelectedDocument(doc)}
+              className={`document-card ${
+                selectedDocument?.document_id === doc.document_id
+                  ? "selected-document"
+                  : ""
+              }`}
+            >
+
+              <div className="document-left">
+
+                <div className="pdf-icon">
+                  <FaFilePdf />
+                </div>
+
+                <div>
+
+                  <h3>{doc.filename}</h3>
+
+                  <span>
+                    {doc.source_format.toUpperCase()} • {doc.total_pages} Pages
+                  </span>
+
+                </div>
 
               </div>
 
-              <div>
+              <div className="document-right">
 
-                <h3>
+                <div className="time">
 
-                  {doc.name}
+                  <FaClock />
 
-                </h3>
+                  {new Date(doc.ingested_at).toLocaleString()}
 
-                <span>
+                </div>
 
-                  PDF • {doc.pages} Pages
+                <span className="ready">
+
+                  Ready
 
                 </span>
 
@@ -90,38 +122,13 @@ function RecentDocuments() {
 
             </div>
 
-            <div className="document-right">
+          ))}
 
-              <div className="time">
+        </div>
 
-                <FaClock />
-
-                {doc.time}
-
-              </div>
-
-              <span
-                className={
-                  doc.status === "Ready"
-                    ? "ready"
-                    : "processing"
-                }
-              >
-
-                {doc.status}
-
-              </span>
-
-            </div>
-
-          </div>
-
-        ))}
-
-      </div>
+      )}
 
     </section>
-
   );
 }
 

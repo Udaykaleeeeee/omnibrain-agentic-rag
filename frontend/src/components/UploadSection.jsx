@@ -18,6 +18,7 @@ function UploadSection() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
   const [uploadResult, setUploadResult] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // -------------------------
   // File Selection
@@ -38,67 +39,67 @@ function UploadSection() {
   // Upload
   // -------------------------
 
-  const handleUpload = async () => {
-    if (!selectedFile) {
-      toast.error("Please select a document.");
-      return;
-    }
+const handleUpload = async () => {
+  if (!selectedFile) {
+    toast.error("Please select a document.");
+    return;
+  }
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
+  const formData = new FormData();
+  formData.append("file", selectedFile);
 
-    try {
-      setLoading(true);
-      setProgress(0);
-      setStatus("");
+  try {
+    setLoading(true);
+    setIsProcessing(false);
+    setProgress(0);
+    setStatus("");
 
-      const response = await uploadDocument(
-        formData,
-        (progressEvent) => {
-          if (!progressEvent.total) return;
+    const response = await uploadDocument(
+      formData,
+      (progressEvent) => {
+        if (!progressEvent.total) return;
 
-          const percent = Math.round(
-            (progressEvent.loaded * 100) /
-              progressEvent.total
-          );
+        const percent = Math.round(
+          (progressEvent.loaded * 100) / progressEvent.total
+        );
 
-          setProgress(percent);
+        setProgress(percent);
+
+        if (percent >= 100) {
+          setIsProcessing(true);
         }
-      );
-
-      setUploadResult(response.data);
-
-      setStatus(response.data.message);
-
-      toast.success("Document uploaded successfully!");
-
-    } catch (error) {
-      console.error(error);
-
-      if (error.response) {
-
-        const detail = error.response.data.detail;
-
-        if (typeof detail === "string") {
-          setStatus(detail);
-          toast.error(detail);
-        } else if (detail?.error) {
-          setStatus(detail.error);
-          toast.error(detail.error);
-        } else {
-          setStatus("Upload failed.");
-          toast.error("Upload failed.");
-        }
-
-      } else {
-        setStatus("Cannot connect to backend.");
-        toast.error("Backend unavailable.");
       }
+    );
 
-    } finally {
-      setLoading(false);
+    setUploadResult(response.data);
+    setStatus(response.data.message);
+
+    toast.success("Document uploaded successfully!");
+  } catch (error) {
+    console.error(error);
+
+    if (error.response) {
+      const detail = error.response.data.detail;
+
+      if (typeof detail === "string") {
+        setStatus(detail);
+        toast.error(detail);
+      } else if (detail?.error) {
+        setStatus(detail.error);
+        toast.error(detail.error);
+      } else {
+        setStatus("Upload failed.");
+        toast.error("Upload failed.");
+      }
+    } else {
+      setStatus("Cannot connect to backend.");
+      toast.error("Backend unavailable.");
     }
-  };
+  } finally {
+    setLoading(false);
+    setIsProcessing(false);
+  }
+};
 
     return (
     <div className="upload-card card">
@@ -172,7 +173,9 @@ function UploadSection() {
 
           <div className="progress-top">
 
-            <span>Uploading...</span>
+            <span>
+             {isProcessing ? "Processing document..." : "Uploading..."}
+            </span>
 
             <span>{progress}%</span>
 
@@ -208,7 +211,7 @@ function UploadSection() {
               size={18}
             />
 
-            Uploading...
+            {isProcessing ? "Processing..." : "Uploading..."}
 
           </>
 
