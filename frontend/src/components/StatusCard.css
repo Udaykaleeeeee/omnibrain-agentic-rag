@@ -1,79 +1,66 @@
 .status-card {
-
   padding: 28px 34px;
-
   display: flex;
-
   justify-content: space-between;
-
   align-items: center;
-
 }
 
 .status-left {
-
   display: flex;
-
   align-items: center;
-
   gap: 22px;
-
 }
 
 .status-icon {
-
   width: 68px;
-
   height: 68px;
-
   border-radius: 18px;
-
   background: #eef5ff;
-
   display: flex;
-
   justify-content: center;
-
   align-items: center;
-
   font-size: 28px;
-
   color: #2563eb;
-
 }
 
 .status-left h3 {
-
   margin: 0;
-
   font-size: 28px;
-
   color: #0f172a;
-
 }
 
 .status-left p {
-
   margin-top: 8px;
-
+  margin-bottom: 4px;
   color: #64748b;
-
   font-size: 18px;
+}
 
+.status-left small {
+  color: #94a3b8;
+  font-size: 14px;
 }
 
 .status-badge {
-
-  background: #fee2e2;
-
-  color: #dc2626;
-
-  font-weight: 700;
-
-  padding: 12px 26px;
-
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
   border-radius: 999px;
+  font-weight: 700;
+  font-size: 17px;
+}
 
-  font-size: 18px;
+.status-dot {
+  font-size: 10px;
+}
 
+.status-badge.online {
+  background: #DCFCE7;
+  color: #15803D;
+}
+
+.status-badge.offline {
+  background: #FEE2E2;
+  color: #DC2626;
 }
