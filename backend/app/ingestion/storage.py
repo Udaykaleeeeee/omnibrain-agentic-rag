@@ -35,8 +35,7 @@ def store_document(
 
     CHUNK_STORE[document_id] = chunks
 
-    if images:
-        IMAGE_STORE[document_id] = images
+    IMAGE_STORE[document_id] = images if images else []
 
     logger.info(
         f"Stored document {document_id} with "
