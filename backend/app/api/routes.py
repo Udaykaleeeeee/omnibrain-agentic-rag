@@ -2,8 +2,8 @@ import logging
 import uuid
 from pathlib import Path
 from typing import Optional, List, Union, Dict, Any
-
-from fastapi import APIRouter, UploadFile, File, HTTPException, Form
+import time
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form, BackgroundTasks
 from pydantic import BaseModel, Field
 
 from ..ingestion import (
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 retrieval_service = RetrievalService()
 qdrant_service = QdrantService()
-
+processing_status = {}
 
 class IngestResponse(BaseModel):
     document_id: str
@@ -63,7 +63,10 @@ def get_supported_formats():
 @router.post("/ingest", response_model=IngestResponse)
 async def ingest_document_endpoint(
     file: UploadFile = File(...),
-    document_id: Optional[str] = Form(None),
+    document_id: Optional[str] = Form(
+    None,
+    description="Optional. Leave empty to auto-generate a unique document ID."
+),
     ocr_fallback: bool = Form(True),
     ocr_images: bool = Form(True),
     remove_headers_footers: bool = Form(True),
@@ -264,6 +267,44 @@ def get_storage_stats():
     stats["vector_count"] = qdrant_service.count_vectors()
     return stats
 
+class ProcessingResponse(BaseModel):
+    document_id: str
+    status: str
+    progress: int
+    current_step: str
+
+
+def process_document(document_id: str):
+
+    processing_status[document_id] = {
+        "status": "processing",
+        "progress": 10,
+        "current_step": "Initializing"
+    }
+
+    time.sleep(2)
+
+    processing_status[document_id] = {
+        "status": "processing",
+        "progress": 40,
+        "current_step": "Extracting text"
+    }
+
+    time.sleep(2)
+
+    processing_status[document_id] = {
+        "status": "processing",
+        "progress": 70,
+        "current_step": "Generating embeddings"
+    }
+
+    time.sleep(2)
+
+    processing_status[document_id] = {
+        "status": "completed",
+        "progress": 100,
+        "current_step": "Completed"
+    }
 
 class SearchRequest(BaseModel):
     query: str
@@ -299,6 +340,47 @@ async def search_documents(request: SearchRequest):
     except Exception as e:
         logger.error(f"Search failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
+
+@router.post("/processing/{document_id}", response_model=ProcessingResponse)
+async def start_processing(
+    document_id: str,
+    background_tasks: BackgroundTasks
+):
+    document = get_document(document_id)
+
+    if not document:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found"
+        )
+
+    background_tasks.add_task(process_document, document_id)
+
+    return ProcessingResponse(
+        document_id=document_id,
+        status="processing",
+        progress=0,
+        current_step="Starting"
+    )
+
+
+@router.get("/processing/{document_id}", response_model=ProcessingResponse)
+async def get_processing_status(document_id: str):
+
+    if document_id not in processing_status:
+        raise HTTPException(
+            status_code=404,
+            detail="Processing status not found"
+        )
+
+    status = processing_status[document_id]
+
+    return ProcessingResponse(
+        document_id=document_id,
+        status=status["status"],
+        progress=status["progress"],
+        current_step=status["current_step"]
+    )
 
 
 class QueryRequest(BaseModel):
@@ -364,3 +446,4 @@ async def generate_memo(request: MemoRequest):
         memo=dummy_memo,
         status="pending_ai_integration"
     )
+
