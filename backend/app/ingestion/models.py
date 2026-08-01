@@ -16,6 +16,10 @@ class PageImage:
     height: Optional[int] = None
     format: Optional[str] = None  # e.g., 'PNG', 'JPEG'
     ocr_text: Optional[str] = None  # Text extracted via OCR if applicable
+    # Image storage metadata
+    image_path: Optional[str] = None  # Path where image is saved
+    bbox: Optional[dict] = None  # Bounding box {x0, y0, x1, y1} if available
+    document_id: Optional[str] = None  # Reference to source document
 
 
 @dataclass

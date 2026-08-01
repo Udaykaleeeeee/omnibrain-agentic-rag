@@ -4,8 +4,19 @@ Handles normalization, cleaning, and boilerplate removal before chunking.
 """
 import re
 import unicodedata
-from typing import List
+from typing import List, Optional
 from collections import Counter
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Try to import language detection
+try:
+    from langdetect import detect, LangDetectException
+    LANGDETECT_AVAILABLE = True
+except ImportError:
+    LANGDETECT_AVAILABLE = False
+    logger.warning("langdetect not available - language detection disabled")
 
 
 def normalize_unicode(text: str) -> str:
@@ -20,7 +31,14 @@ def normalize_whitespace(text: str) -> str:
     - Collapse multiple spaces into one
     - Remove trailing/leading whitespace from lines
     - Collapse multiple newlines (>2) into double newline
+    - Remove zero-width spaces and other invisible characters
     """
+    # Remove zero-width spaces and other problematic Unicode
+    text = text.replace('\u200b', '')  # Zero-width space
+    text = text.replace('\u200c', '')  # Zero-width non-joiner
+    text = text.replace('\u200d', '')  # Zero-width joiner
+    text = text.replace('\ufeff', '')  # Zero-width no-break space (BOM)
+    
     # Replace tabs with spaces
     text = text.replace('\t', ' ')
     
@@ -121,12 +139,71 @@ def is_empty_or_garbage(text: str, min_length: int = 20) -> bool:
     return False
 
 
+def fix_encoding_issues(text: str) -> str:
+    """
+    Fix common encoding issues (mojibake) in text.
+    Handles common problems from incorrect UTF-8 decoding.
+    """
+    if not text:
+        return text
+    
+    # Common mojibake patterns and their fixes
+    replacements = {
+        'â€™': "'",  # Right single quotation mark
+        'â€œ': '"',  # Left double quotation mark
+        'â€': '"',   # Right double quotation mark
+        'â€"': '—',  # Em dash
+        'â€"': '–',  # En dash
+        'Ã©': 'é',   # e with acute
+        'Ã¨': 'è',   # e with grave
+        'Ã¡': 'á',   # a with acute
+        'Ã³': 'ó',   # o with acute
+        'Ã±': 'ñ',   # n with tilde
+        'Ã¼': 'ü',   # u with diaeresis
+        'â€¦': '...',  # Ellipsis
+        'Â': '',     # Often a spurious character
+    }
+    
+    for wrong, right in replacements.items():
+        text = text.replace(wrong, right)
+    
+    return text
+
+
+def detect_language(text: str) -> Optional[str]:
+    """
+    Detect the language of the given text.
+    Returns ISO 639-1 language code (e.g., 'en', 'es', 'fr') or None if detection fails.
+    """
+    if not LANGDETECT_AVAILABLE:
+        logger.debug("Language detection not available (langdetect not installed)")
+        return None
+    
+    if not text or len(text.strip()) < 50:
+        logger.debug("Text too short for reliable language detection")
+        return None
+    
+    try:
+        # Use first 1000 characters for detection (faster and usually sufficient)
+        sample = text[:1000]
+        lang = detect(sample)
+        logger.info(f"Detected language: {lang}")
+        return lang
+    except LangDetectException as e:
+        logger.debug(f"Language detection failed: {e}")
+        return None
+    except Exception as e:
+        logger.warning(f"Unexpected error in language detection: {e}")
+        return None
+
+
 def preprocess_text(raw: str, repeated_patterns: List[str] = None) -> str:
     """Main preprocessing: applies all cleaning steps."""
     if not raw:
         return ""
     
-    text = normalize_unicode(raw)
+    text = fix_encoding_issues(raw)  # Fix mojibake first
+    text = normalize_unicode(text)
     text = dehyphenate(text)
     text = normalize_whitespace(text)
     text = remove_page_numbers(text)
@@ -134,6 +211,6 @@ def preprocess_text(raw: str, repeated_patterns: List[str] = None) -> str:
     if repeated_patterns:
         text = remove_repeated_patterns(text, repeated_patterns)
     
-    text = normalize_whitespace(text)
+    text = normalize_whitespace(text)  # Final whitespace pass
     
     return text
