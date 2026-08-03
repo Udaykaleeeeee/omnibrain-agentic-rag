@@ -1,6 +1,26 @@
 # OmniBrain Document Ingestion Module
 
-Multi-format document ingestion system with OCR support for RAG applications.
+Multi-format document ingestion system with OCR support, vector embeddings, and semantic search for RAG applications.
+
+## Status
+
+✅ **Production Ready**:
+- Document ingestion (PDF, DOCX, TXT)
+- Image extraction and storage
+- Language detection
+- Metadata extraction
+- Vector embeddings
+- Semantic search
+- Full CRUD API
+
+⏳ **In Development**:
+- Bounding box extraction
+- Visual embeddings
+- Multi-language support
+- Advanced analytics
+
+**Version**: 2.0.0  
+**Last Updated**: 2026-07-22
 
 ## Features
 
@@ -53,6 +73,27 @@ uvicorn app.main:app --reload --port 8000
 - **Health Check**: http://127.0.0.1:8000/health
 
 ## API Endpoints
+
+### Information
+
+**GET /** - API welcome message (served by FastAPI root)
+
+**GET /health** - Health check endpoint
+
+**GET /test** - Test API routes
+```bash
+curl http://127.0.0.1:8000/test
+```
+
+**GET /stats** - Get storage statistics
+```bash
+curl http://127.0.0.1:8000/stats
+```
+
+**GET /ingest/formats** - Get supported file formats
+```bash
+curl http://127.0.0.1:8000/ingest/formats
+```
 
 ### Ingestion
 
@@ -116,21 +157,9 @@ curl http://127.0.0.1:8000/documents/doc-001/images
 curl http://127.0.0.1:8000/documents/doc-001/images/0
 ```
 
-**GET /stats** - Get storage statistics
-```bash
-curl http://127.0.0.1:8000/stats
-```
-
 **DELETE /documents/{id}** - Delete document and associated images
 ```bash
 curl -X DELETE http://127.0.0.1:8000/documents/doc-001
-```
-
-### Information
-
-**GET /ingest/formats** - List supported formats
-```bash
-curl http://127.0.0.1:8000/ingest/formats
 ```
 
 ### Search
@@ -147,6 +176,13 @@ curl -X POST "http://127.0.0.1:8000/search" \
 curl -X POST "http://127.0.0.1:8000/query" \
   -H "Content-Type: application/json" \
   -d '{"question": "What is this document about?"}'
+```
+
+**POST /generate-memo** - Generate document memo (placeholder)
+```bash
+curl -X POST "http://127.0.0.1:8000/generate-memo" \
+  -H "Content-Type: application/json" \
+  -d '{"document_id": "doc-001", "focus_area": "summary"}'
 ```
 
 ## Python Usage
@@ -244,25 +280,26 @@ Metadata Storage (in-memory)
 Response with metadata
 ```
 
-## Configuration
+### Configuration
 
-### Chunking
-- **Chunk Size**: 500 characters
-- **Overlap**: 100 characters
+**Chunking**:
+- Chunk Size: 500 characters
+- Overlap: 100 characters
 
-### OCR
-- **Engine**: Tesseract v5.5.0+
-- **Language**: English (default)
-- **Trigger**: Automatic for pages with <20 chars
+**OCR**:
+- Engine: Tesseract v5.5.0+
+- Language: English (default)
+- Trigger: Automatic for pages with <20 characters
 
-### Preprocessing
+**Preprocessing**:
 - Unicode normalization (NFKC)
-- Encoding fixes (handles mojibake: â€™→', Ã©→é, etc.)
-- Whitespace cleaning (removes zero-width spaces)
-- De-hyphenation
-- Header/footer removal
+- Encoding fixes for mojibake (â€™→', Ã©→é, etc.)
+- Whitespace cleaning and zero-width space removal
+- De-hyphenation across line breaks
+- Header/footer detection and removal
+- Page number removal
 - Empty page filtering
-- Language detection (ISO 639-1 codes)
+- Language detection (ISO 639-1 codes, requires >50 chars)
 
 ## Supported Formats
 
@@ -275,19 +312,22 @@ Response with metadata
 ## Storage
 
 **Current Implementation**:
-- **In-memory storage**: Document metadata and chunks (temporary, fast)
-- **Vector database**: Qdrant for embeddings and semantic search
-- **Image storage**: Disk-based (`backend/uploads/images/`)
+
+| Component | Storage Type | Persistence | Location |
+|-----------|-------------|-------------|----------|
+| Document metadata | In-memory | ❌ Lost on restart | Python dict |
+| Chunks | In-memory | ❌ Lost on restart | Python dict |
+| Images | Disk | ✅ Persistent | `backend/uploads/images/` |
+| Vectors | Qdrant | ✅ Persistent* | In-memory or localhost:6333 |
+
+*Qdrant can run in-memory (development) or persistent mode (production)
+
+**Image Storage Details**:
 - **Naming convention**: `{doc_id}_p{page:04d}_img{index:03d}.{ext}`
+- **Example**: `doc-123_p0003_img000.png`
+- **Metadata tracked**: Page number, dimensions, format, OCR text, bounding box (future)
 
-⚠️ **Note**: In-memory data is lost on server restart (development mode)
-
-**Features**:
-- ✅ Fast retrieval
-- ✅ Full metadata tracking
-- ✅ Persistent image storage
-- ✅ Vector similarity search
-- ✅ Semantic retrieval
+⚠️ **Note**: Document metadata and chunks are stored in-memory for development. Use PostgreSQL or similar for production.
 
 ## Development
 
@@ -341,44 +381,6 @@ Test with Swagger UI:
    - Use S3/MinIO for cloud storage
    - Set up CDN for image delivery
    - Configure backup strategy
-
-## New Features (v2.0.0)
-
-### 1. Image Extraction & Storage
-- **Automatic extraction** of embedded images from PDF and DOCX
-- **Persistent storage** on disk with structured naming
-- **Metadata tracking**: page number, dimensions, format, OCR text
-- **Separate OCR**: Images have their own OCR text (not merged into page text)
-- **API access**: Retrieve image metadata via REST endpoints
-
-**Image naming**: `{doc_id}_p{page:04d}_img{index:03d}.{ext}`  
-**Storage path**: `backend/uploads/images/`
-
-### 2. Enhanced Text Preprocessing
-- **Encoding fixes**: Automatically corrects mojibake (â€™→', Ã©→é, etc.)
-- **Enhanced whitespace**: Removes zero-width spaces and invisible Unicode
-- **Language detection**: Identifies document language (ISO 639-1 codes)
-- **Backward compatible**: All existing preprocessing preserved
-
-**Supported encodings**: UTF-8, Latin-1, Windows-1252, and auto-detection via chardet
-
-### 3. Improved Metadata Extraction
-- **PDF metadata**: Title, author, subject, keywords, dates, creator, producer
-- **DOCX metadata**: Title, author, subject, keywords, created/modified dates
-- **TXT metadata**: File size, encoding, timestamps
-- **Auto-detected**: Language code stored in metadata
-- **API exposure**: All metadata available in document details endpoint
-
-**Example metadata**:
-```json
-{
-  "title": "Research Paper",
-  "author": "John Doe",
-  "created": "2024-01-15",
-  "detected_language": "en",
-  "keywords": "AI, machine learning"
-}
-```
 
 ## Troubleshooting
 
@@ -457,26 +459,9 @@ This is a production-ready ingestion module for the OmniBrain RAG system.
 
 [Your License Here]
 
-## Status
-
-✅ **Production Ready**:
-- Document ingestion (PDF, DOCX, TXT)
-- Image extraction and storage
-- Language detection
-- Metadata extraction
-- Vector embeddings
-- Semantic search
-- Full CRUD API
-
-⏳ **In Development**:
-- Bounding box extraction
-- Visual embeddings
-- Multi-language support
-- Advanced analytics
-
 ---
 
-**Last Updated**: 2026-07-22
-**Version**: 2.0.0
-**Server**: http://127.0.0.1:8000
+**Last Updated**: 2026-07-22  
+**Version**: 2.0.0  
+**Server**: http://127.0.0.1:8000  
 **Docs**: http://127.0.0.1:8000/docs
