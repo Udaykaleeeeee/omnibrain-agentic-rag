@@ -191,8 +191,12 @@ class QdrantService:
                     "document_id": document_id,
                     "image_path": meta.get("image_path", ""),
                     "page_number": meta.get("page_number", 1),
+                    "image_index": meta.get("image_index", 0),
                     "filename": meta.get("filename", ""),
-                    "caption": meta.get("caption", ""),
+                    "format": meta.get("format", ""),
+                    "width": meta.get("width"),
+                    "height": meta.get("height"),
+                    "ocr_text": meta.get("ocr_text", ""),
                 },
             )
             points.append(point)
@@ -430,4 +434,4 @@ class QdrantService:
             return info.points_count or 0
         except Exception as e:
             logger.error(f"Error getting vector count for {target}: {e}")
-            return 0
+            return 0

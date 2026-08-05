@@ -39,6 +39,8 @@ class IngestResponse(BaseModel):
     ocr_pages_used: int
     chunks_created: int
     images_extracted: Optional[int] = 0
+    embeddings_created: Optional[int] = 0
+    image_embeddings_created: Optional[int] = 0
     metadata: Optional[Dict[str, Any]] = None
     status: str
     message: Optional[str] = None
@@ -120,6 +122,8 @@ async def ingest_document_endpoint(
             ocr_pages_used=result["ocr_pages_used"],
             chunks_created=result["chunks_created"],
             images_extracted=result.get("images_extracted", 0),
+            embeddings_created=result.get("embeddings_created", 0),
+            image_embeddings_created=result.get("image_embeddings_created", 0),
             metadata=result.get("metadata"),
             status=result["status"],
             message=f"Successfully ingested {file.filename}"
