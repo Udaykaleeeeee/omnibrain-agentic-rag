@@ -17,7 +17,11 @@ def search_agent(state: AgentState) -> AgentState:
 
     # Retrieve relevant document chunks
     retrieval_service = RetrievalService()
-    result = retrieval_service.retrieve(state["query"])
+    result = retrieval_service.retrieve(
+    query=state["query"],
+    top_k=state["top_k"],
+    document_id=state["document_id"],
+)
     retrieved_chunks = result["chunks"]
 
     # Preserve citation metadata

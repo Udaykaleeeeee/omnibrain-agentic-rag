@@ -23,6 +23,8 @@ from ..ingestion.storage import (
 )
 from ..ingestion.image_storage import delete_document_images
 from ..vector_db import RetrievalService, QdrantService
+from ..agents.graph import graph
+from ..agents.llm import get_llm
 
 logger = logging.getLogger(__name__)
 
@@ -398,29 +400,37 @@ class QueryResponse(BaseModel):
 
 @router.post("/query", response_model=QueryResponse)
 async def query_documents(request: QueryRequest):
-    """Ask a question and get retrieved relevant sources and citations"""
+    """Ask a question through the LangGraph workflow."""
 
-    if not request.question or request.question.strip() == "":
+    if not request.question or not request.question.strip():
         raise HTTPException(status_code=400, detail="Question cannot be empty")
 
     try:
-        retrieval_res = retrieval_service.retrieve(
-            query=request.question,
-            top_k=request.top_k or 5,
-            document_id=request.document_id,
-        )
+        state = {
+            "query": request.question,
+            "response": None,
+            "documents": [],
+            "images": [],
+            "document_id": request.document_id,
+            "top_k": request.top_k or 5,
+            "citations": [],
+            "next_agent": None,
+        }
+
+        result = graph.invoke(state)
+
         return QueryResponse(
             question=request.question,
-            answer="Retrieved relevant chunks. AI Agent synthesis ready.",
-            sources=retrieval_res["chunks"],
-            rag_context=retrieval_res["rag_context"],
+            answer=result.get("response") or "No answer generated.",
+            sources=result.get("citations", []),
+            rag_context=None,
         )
+
     except Exception as e:
-        logger.error(f"Query endpoint failed: {e}")
-        return QueryResponse(
-            question=request.question,
-            answer=f"Error executing retrieval: {str(e)}",
-            sources=[],
+        logger.error(f"Query endpoint failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Query endpoint failed: {str(e)}",
         )
 
 
@@ -440,10 +450,48 @@ async def generate_memo(request: MemoRequest):
     if not request.document_id or request.document_id.strip() == "":
         raise HTTPException(status_code=400, detail="Document ID cannot be empty")
 
-    dummy_memo = "This is a placeholder memo. Full report generation coming soon."
-    return MemoResponse(
-        document_id=request.document_id,
-        memo=dummy_memo,
-        status="pending_ai_integration"
-    )
+    try:
+        chunks = get_chunks(request.document_id)
 
+        if not chunks:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No chunks found for document {request.document_id}"
+            )
+
+        context = "\n\n".join(
+            chunk.get("text", "")
+            for chunk in chunks
+            if chunk.get("text")
+        )
+
+        focus = request.focus_area or "Provide a comprehensive summary of the document."
+
+        prompt = f"""
+Generate a concise but useful memo based only on the document context below.
+
+Focus:
+{focus}
+
+Document Context:
+{context}
+"""
+
+        model = get_llm()
+        response = model.generate_content(prompt)
+
+        return MemoResponse(
+            document_id=request.document_id,
+            memo=response.text,
+            status="completed"
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Memo generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Memo generation failed: {str(e)}"
+        )
