@@ -104,6 +104,9 @@
     border:1px solid #E2E8F0;
 
     background:#F8FAFC;
+     color:#0F172A;          /* ADD THIS */
+
+    caret-color:#2563EB;
 
     font-size:16px;
 
@@ -112,18 +115,29 @@
     transition:.3s;
 
 }
+.chat-input::placeholder{
 
+    color:#94A3B8;
+
+}
 .chat-input:focus{
 
     border-color:#2563EB;
 
     background:white;
 
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,.08);
+
 }
+
+/* =====================================
+   ASK BUTTON
+===================================== */
 
 .ask-btn{
 
-    min-width:120px;
+    min-width:130px;
 
     border:none;
 
@@ -153,11 +167,29 @@
 
     transition:.3s;
 
+    box-shadow:
+    0 10px 25px rgba(37,99,235,.20);
+
 }
 
-.ask-btn:hover{
+.ask-btn:not(:disabled):hover{
 
     transform:translateY(-2px);
+
+    box-shadow:
+    0 15px 30px rgba(79,70,229,.25);
+
+}
+
+.ask-btn:disabled{
+
+    opacity:.55;
+
+    cursor:not-allowed;
+
+    transform:none;
+
+    box-shadow:none;
 
 }
 
@@ -174,6 +206,15 @@
     border:1px solid #E2E8F0;
 
     padding:35px;
+
+    transition:.3s;
+
+}
+
+.answer-card:hover{
+
+    box-shadow:
+    0 10px 30px rgba(15,23,42,.05);
 
 }
 
@@ -215,11 +256,15 @@
 
     margin-bottom:10px;
 
+    font-size:22px;
+
 }
 
 .answer-empty p{
 
     color:#64748B;
+
+    line-height:1.7;
 
 }
 
@@ -238,6 +283,14 @@
     background:#F8FAFC;
 
     border:1px solid #E2E8F0;
+
+    transition:.3s;
+
+}
+
+.citation-box:hover{
+
+    border-color:#BFDBFE;
 
 }
 
@@ -277,27 +330,39 @@
 
 .chat-section{
 
-padding:25px;
+    padding:25px;
 
 }
 
 .chat-header h2{
 
-font-size:28px;
+    font-size:28px;
 
 }
 
 .chat-input-wrapper{
 
-flex-direction:column;
+    flex-direction:column;
 
 }
 
 .ask-btn{
 
-height:55px;
+    height:55px;
 
-width:100%;
+    width:100%;
+
+}
+
+.answer-card{
+
+    padding:25px;
+
+}
+
+.citation-box{
+
+    padding:20px;
 
 }
 

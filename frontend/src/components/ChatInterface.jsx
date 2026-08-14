@@ -1,10 +1,23 @@
 import { useState } from "react";
-import { FaComments, FaPaperPlane, FaFileAlt } from "react-icons/fa";
+import {
+  FaComments,
+  FaPaperPlane,
+  FaFileAlt,
+} from "react-icons/fa";
 
 import "./ChatInterface.css";
 
 function ChatInterface() {
   const [question, setQuestion] = useState("");
+
+  const handleAsk = () => {
+    if (!question.trim()) return;
+
+    console.log("Ask question:", question);
+
+    // Future:
+    // Call /query API here
+  };
 
   return (
     <section className="chat-section card">
@@ -31,9 +44,18 @@ function ChatInterface() {
           placeholder="Ask a question about uploaded documents..."
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && question.trim()) {
+              handleAsk();
+            }
+          }}
         />
 
-        <button className="ask-btn">
+        <button
+          className="ask-btn"
+          onClick={handleAsk}
+          disabled={!question.trim()}
+        >
           <FaPaperPlane />
           Ask
         </button>
