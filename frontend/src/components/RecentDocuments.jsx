@@ -4,9 +4,13 @@ import {
   FaFilePdf,
   FaArrowRight,
   FaClock,
+  FaTrash,
 } from "react-icons/fa";
 
-import { getDocuments } from "../services/api";
+import {
+  getDocuments,
+  deleteDocument,
+} from "../services/api";
 
 function RecentDocuments({
   selectedDocument,
@@ -20,8 +24,10 @@ function RecentDocuments({
       const response = await getDocuments();
 
       const docs = response.data.documents || [];
+      console.log("Documents API Response:", docs);
 
       setDocuments(docs);
+      console.log("Documents State:", docs.length);
 
       // Automatically select the first document
       if (docs.length > 0 && !selectedDocument) {
@@ -34,10 +40,37 @@ function RecentDocuments({
       setLoading(false);
     }
   };
+  const handleDelete = async (documentId) => {
+  try {
+    await deleteDocument(documentId);
+
+    const updatedDocs = documents.filter(
+      (doc) => doc.document_id !== documentId
+    );
+
+    setDocuments(updatedDocs);
+
+    if (
+      selectedDocument?.document_id === documentId
+    ) {
+      setSelectedDocument(
+        updatedDocs.length > 0
+          ? updatedDocs[0]
+          : null
+      );
+    }
+  } catch (error) {
+    console.error("Delete failed:", error);
+  }
+};
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+  fetchDocuments();
+
+  const interval = setInterval(fetchDocuments, 5000);
+
+  return () => clearInterval(interval);
+}, []);
 
   return (
     <section className="recent-documents card fade">
@@ -112,11 +145,23 @@ function RecentDocuments({
 
                 </div>
 
-                <span className="ready">
+                <div className="document-actions">
 
-                  Ready
+  <span className="ready">
+    Ready
+  </span>
 
-                </span>
+  <button
+    className="delete-btn"
+    onClick={(e) => {
+      e.stopPropagation();
+      handleDelete(doc.document_id);
+    }}
+  >
+    <FaTrash />
+  </button>
+
+</div>
 
               </div>
 

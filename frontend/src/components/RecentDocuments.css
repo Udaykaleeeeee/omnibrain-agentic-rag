@@ -385,3 +385,27 @@ align-items:flex-start;
     cursor:pointer;
 
 }
+.document-actions{
+    display:flex;
+    align-items:center;
+    gap:10px;
+}
+
+.delete-btn{
+    width:36px;
+    height:36px;
+    border:none;
+    border-radius:10px;
+    background:#FEF2F2;
+    color:#DC2626;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    transition:.25s;
+}
+
+.delete-btn:hover{
+    background:#FEE2E2;
+    transform:translateY(-2px);
+}

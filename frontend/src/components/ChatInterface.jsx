@@ -6,17 +6,30 @@ import {
 } from "react-icons/fa";
 
 import "./ChatInterface.css";
+import { askQuestion } from "../services/api";
 
 function ChatInterface() {
   const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleAsk = () => {
+  const handleAsk = async () => {
     if (!question.trim()) return;
 
-    console.log("Ask question:", question);
+    try {
+      setLoading(true);
 
-    // Future:
-    // Call /query API here
+      const response = await askQuestion(question);
+
+      setAnswer(response.data.answer);
+
+    } catch (error) {
+      console.error("Query Error:", error);
+
+      setAnswer("Failed to retrieve answer.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,10 +67,10 @@ function ChatInterface() {
         <button
           className="ask-btn"
           onClick={handleAsk}
-          disabled={!question.trim()}
+          disabled={!question.trim() || loading}
         >
           <FaPaperPlane />
-          Ask
+          {loading ? "Thinking..." : "Ask"}
         </button>
 
       </div>
@@ -68,17 +81,27 @@ function ChatInterface() {
           <h3>Answer</h3>
         </div>
 
-        <div className="answer-empty">
+        {answer ? (
 
-          <FaComments />
+          <div className="answer-content">
+            <p>{answer}</p>
+          </div>
 
-          <h3>No Question Asked Yet</h3>
+        ) : (
 
-          <p>
-            Upload a document and ask a question to begin retrieval.
-          </p>
+          <div className="answer-empty">
 
-        </div>
+            <FaComments />
+
+            <h3>No Question Asked Yet</h3>
+
+            <p>
+              Upload a document and ask a question to begin retrieval.
+            </p>
+
+          </div>
+
+        )}
 
       </div>
 

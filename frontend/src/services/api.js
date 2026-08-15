@@ -43,4 +43,11 @@ export const deleteDocument = (documentId) => {
   return api.delete(`/documents/${documentId}`);
 };
 
+
+export const askQuestion = (question) => {
+  return api.post("/query", {
+    question,
+    top_k: 5,
+  });
+};
 export default api;
