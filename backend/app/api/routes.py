@@ -451,19 +451,26 @@ async def generate_memo(request: MemoRequest):
         raise HTTPException(status_code=400, detail="Document ID cannot be empty")
 
     try:
-        chunks = get_chunks(request.document_id)
+        retrieval_result = retrieval_service.retrieve(
+            query=request.focus_area or "Provide a comprehensive summary of the document.",
+            top_k=10,
+            document_id=request.document_id,
+            enable_hybrid=False,
+        )
+
+        chunks = retrieval_result.get("chunks", [])
 
         if not chunks:
             raise HTTPException(
-                status_code=404,
-                detail=f"No chunks found for document {request.document_id}"
-            )
+                    status_code=404,
+                    detail=f"No chunks found for document {request.document_id}"
+                )
 
         context = "\n\n".join(
-            chunk.get("text", "")
-            for chunk in chunks
-            if chunk.get("text")
-        )
+                chunk.get("text", "")
+                for chunk in chunks
+                if chunk.get("text")
+            )
 
         focus = request.focus_area or "Provide a comprehensive summary of the document."
 
