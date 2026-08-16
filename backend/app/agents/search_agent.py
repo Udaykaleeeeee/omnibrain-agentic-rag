@@ -5,7 +5,7 @@ Search Agent for OmniBrain.
 from .llm import get_llm
 from .prompts import SEARCH_AGENT_PROMPT
 from .state import AgentState
-from ..vector_db.retrieval import RetrievalService
+from ..vector_db import RetrievalService
 
 
 def search_agent(state: AgentState) -> AgentState:
@@ -15,7 +15,7 @@ def search_agent(state: AgentState) -> AgentState:
 
     model = get_llm()
 
-    # Retrieve relevant document chunks using Member 3's Retrieval Service
+    # Retrieve relevant document chunks using Qdrant RetrievalService
     retrieval_service = RetrievalService()
 
     retrieval_result = retrieval_service.retrieve(
@@ -23,7 +23,7 @@ def search_agent(state: AgentState) -> AgentState:
         top_k=5
     )
 
-    # Store citations
+    # Store citations returned by the retrieval service
     state["citations"] = retrieval_result["citations"]
 
     # Build context for Gemini
