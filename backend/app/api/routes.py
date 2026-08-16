@@ -5,6 +5,7 @@ from typing import Optional, List, Union, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
+from ..agents.llm import get_llm
 
 from ..ingestion import (
     ingest_document,
@@ -879,24 +880,60 @@ class MemoResponse(BaseModel):
 # GENERATE MEMO
 # ============================================================
 
-@router.post(
-    "/generate-memo",
-    response_model=MemoResponse
-)
-async def generate_memo(
-    request: MemoRequest
-):
+@router.post("/generate-memo", response_model=MemoResponse)
+async def generate_memo(request: MemoRequest):
+    if not request.document_id or request.document_id.strip() == "":
+        raise HTTPException(status_code=400, detail="Document ID cannot be empty")
 
-    dummy_memo = (
-        "This is a placeholder memo. "
-        "Full report generation coming soon."
-    )
+    try:
+        retrieval_result = retrieval_service.retrieve(
+            query=request.focus_area or "Provide a comprehensive summary of the document.",
+            top_k=10,
+            document_id=request.document_id,
+            enable_hybrid=False,
+        )
 
-    return MemoResponse(
+        chunks = retrieval_result.get("chunks", [])
 
-        document_id=request.document_id,
+        if not chunks:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No chunks found for document {request.document_id}"
+            )
 
-        memo=dummy_memo,
+        context = "\n\n".join(
+            chunk.get("text", "")
+            for chunk in chunks
+            if chunk.get("text")
+        )
 
-        status="pending_ai_integration",
-    )
+        focus = request.focus_area or "Provide a comprehensive summary of the document."
+
+        prompt = f"""
+Generate a concise but useful memo based only on the document context below.
+
+Focus:
+{focus}
+
+Document Context:
+{context}
+"""
+
+        model = get_llm()
+        response = model.generate_content(prompt)
+
+        return MemoResponse(
+            document_id=request.document_id,
+            memo=response.text,
+            status="completed"
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        logger.error(f"Memo generation failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Memo generation failed: {str(e)}"
+        )

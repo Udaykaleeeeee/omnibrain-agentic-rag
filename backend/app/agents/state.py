@@ -15,4 +15,8 @@ class AgentState(TypedDict):
     # Metadata returned by Retrieval Service
     citations: List[Dict]
 
+    document_id: Optional[str]
+    top_k: int
+
+
     next_agent: Optional[str]
