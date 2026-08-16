@@ -1,0 +1,317 @@
+/* ==================================================
+   AI PROCESSING PIPELINE
+================================================== */
+
+.pipeline-section{
+
+    padding:55px;
+
+    margin:40px 0;
+
+    background:linear-gradient(
+        180deg,
+        rgba(255,255,255,.96),
+        rgba(248,250,252,.98)
+    );
+
+    overflow:hidden;
+
+    position:relative;
+
+}
+
+/* Background Glow */
+
+.pipeline-section::before{
+
+    content:"";
+
+    position:absolute;
+
+    width:420px;
+
+    height:420px;
+
+    background:#DBEAFE;
+
+    filter:blur(120px);
+
+    border-radius:50%;
+
+    top:-180px;
+
+    right:-150px;
+
+    opacity:.45;
+
+}
+
+/* ================================= */
+
+.pipeline-heading{
+
+    text-align:center;
+
+    margin-bottom:60px;
+
+    position:relative;
+
+    z-index:2;
+
+}
+
+.pipeline-heading span{
+
+    display:inline-block;
+
+    padding:10px 20px;
+
+    border-radius:999px;
+
+    background:#EEF2FF;
+
+    color:#4F46E5;
+
+    font-size:14px;
+
+    font-weight:700;
+
+}
+
+.pipeline-heading h2{
+
+    margin-top:20px;
+
+    font-size:40px;
+
+    font-weight:800;
+
+    color:#0F172A;
+
+}
+
+.pipeline-heading p{
+
+    margin:18px auto 0;
+
+    max-width:760px;
+
+    font-size:17px;
+
+    line-height:1.8;
+
+    color:#64748B;
+
+}
+
+/* ================================= */
+
+.workflow{
+
+    position:relative;
+
+    max-width:700px;
+
+    margin:auto;
+
+}
+
+/* Center Line */
+
+.workflow::before{
+
+    content:"";
+
+    position:absolute;
+
+    left:40px;
+
+    top:0;
+
+    width:5px;
+
+    height:100%;
+
+    border-radius:999px;
+
+    background:linear-gradient(
+        #2563EB,
+        #4F46E5,
+        #7C3AED
+    );
+
+}
+
+/* ================================= */
+
+.workflow-step{
+
+    position:relative;
+
+    display:flex;
+
+    align-items:center;
+
+    gap:28px;
+
+    margin-bottom:45px;
+
+    z-index:2;
+
+}
+
+/* ================================= */
+
+.workflow-icon{
+
+    width:80px;
+
+    height:80px;
+
+    border-radius:50%;
+
+    background:linear-gradient(
+        135deg,
+        #2563EB,
+        #4F46E5
+    );
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    color:white;
+
+    font-size:30px;
+
+    box-shadow:
+    0 18px 45px rgba(37,99,235,.25);
+
+    border:5px solid white;
+
+    transition:.35s;
+
+    flex-shrink:0;
+
+}
+
+.workflow-icon:hover{
+
+    transform:scale(1.08);
+
+    box-shadow:
+    0 22px 55px rgba(79,70,229,.35);
+
+}
+
+/* ================================= */
+
+.workflow-content{
+
+    flex:1;
+
+    background:white;
+
+    padding:24px;
+
+    border-radius:22px;
+
+    border:1px solid #E2E8F0;
+
+    box-shadow:
+    0 12px 30px rgba(15,23,42,.05);
+
+    transition:.35s;
+
+}
+
+.workflow-content:hover{
+
+    transform:translateX(10px);
+
+    box-shadow:
+    0 20px 45px rgba(15,23,42,.10);
+
+}
+
+.workflow-content h3{
+
+    font-size:22px;
+
+    margin-bottom:8px;
+
+    color:#0F172A;
+
+}
+
+.workflow-content p{
+
+    color:#64748B;
+
+    line-height:1.6;
+
+    font-size:15px;
+
+}
+
+/* ================================= */
+
+.workflow-line{
+
+    display:none;
+
+}
+
+/* ================================= */
+
+@media(max-width:768px){
+
+.pipeline-section{
+
+padding:30px 22px;
+
+}
+
+.pipeline-heading h2{
+
+font-size:30px;
+
+}
+
+.workflow::before{
+
+left:32px;
+
+}
+
+.workflow-step{
+
+gap:18px;
+
+}
+
+.workflow-icon{
+
+width:64px;
+
+height:64px;
+
+font-size:24px;
+
+}
+
+.workflow-content{
+
+padding:18px;
+
+}
+
+.workflow-content h3{
+
+font-size:18px;
+
+}
+
+}

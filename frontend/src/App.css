@@ -1,0 +1,43 @@
+@import "./styles/globals.css";
+
+html{
+
+scroll-behavior:smooth;
+
+}
+
+body{
+
+background:#F8FAFC;
+
+}
+
+.app{
+
+min-height:100vh;
+
+padding:35px 0 70px;
+
+background:
+
+radial-gradient(circle at top left,#DBEAFE 0%,transparent 30%),
+
+radial-gradient(circle at bottom right,#DDD6FE 0%,transparent 35%),
+
+#F8FAFC;
+
+}
+
+.container{
+
+width:min(1250px,92%);
+
+margin:auto;
+
+}
+
+section{
+
+margin-bottom:35px;
+
+}
