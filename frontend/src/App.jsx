@@ -1,6 +1,6 @@
 import "./App.css";
 import "react-toastify/dist/ReactToastify.css";
-
+import ChatInterface from "./components/ChatInterface";
 import { ToastContainer } from "react-toastify";
 import { useState } from "react";
 
@@ -24,6 +24,9 @@ function App() {
 
         <section id="upload">
           <UploadSection />
+        </section>
+        <section id="chat">
+          <ChatInterface />
         </section>
 
         <section id="pipeline">

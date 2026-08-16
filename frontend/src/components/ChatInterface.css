@@ -1,0 +1,369 @@
+/* =====================================
+   CHAT SECTION
+===================================== */
+
+.chat-section{
+
+    margin:40px 0;
+
+    padding:40px;
+
+    border-radius:28px;
+
+    background:linear-gradient(
+        180deg,
+        rgba(255,255,255,.96),
+        rgba(248,250,252,.98)
+    );
+
+    border:1px solid #E2E8F0;
+
+    box-shadow:
+    0 15px 45px rgba(15,23,42,.06);
+
+}
+
+/* =====================================
+   HEADER
+===================================== */
+
+.chat-header{
+
+    text-align:center;
+
+    margin-bottom:35px;
+
+}
+
+.chat-badge{
+
+    display:inline-block;
+
+    padding:10px 18px;
+
+    border-radius:999px;
+
+    background:#EEF2FF;
+
+    color:#4F46E5;
+
+    font-size:14px;
+
+    font-weight:700;
+
+}
+
+.chat-header h2{
+
+    margin-top:18px;
+
+    font-size:36px;
+
+    font-weight:800;
+
+    color:#0F172A;
+
+}
+
+.chat-header p{
+
+    margin-top:12px;
+
+    color:#64748B;
+
+    font-size:16px;
+
+    line-height:1.7;
+
+}
+
+/* =====================================
+   INPUT AREA
+===================================== */
+
+.chat-input-wrapper{
+
+    display:flex;
+
+    gap:15px;
+
+    margin-bottom:30px;
+
+}
+
+.chat-input{
+
+    flex:1;
+
+    height:60px;
+
+    padding:0 20px;
+
+    border-radius:16px;
+
+    border:1px solid #E2E8F0;
+
+    background:#F8FAFC;
+     color:#0F172A;          /* ADD THIS */
+
+    caret-color:#2563EB;
+
+    font-size:16px;
+
+    outline:none;
+
+    transition:.3s;
+
+}
+.chat-input::placeholder{
+
+    color:#94A3B8;
+
+}
+.chat-input:focus{
+
+    border-color:#2563EB;
+
+    background:white;
+
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,.08);
+
+}
+
+/* =====================================
+   ASK BUTTON
+===================================== */
+
+.ask-btn{
+
+    min-width:130px;
+
+    border:none;
+
+    border-radius:16px;
+
+    background:linear-gradient(
+        135deg,
+        #2563EB,
+        #4F46E5
+    );
+
+    color:white;
+
+    font-weight:700;
+
+    font-size:15px;
+
+    cursor:pointer;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    gap:10px;
+
+    transition:.3s;
+
+    box-shadow:
+    0 10px 25px rgba(37,99,235,.20);
+
+}
+
+.ask-btn:not(:disabled):hover{
+
+    transform:translateY(-2px);
+
+    box-shadow:
+    0 15px 30px rgba(79,70,229,.25);
+
+}
+
+.ask-btn:disabled{
+
+    opacity:.55;
+
+    cursor:not-allowed;
+
+    transform:none;
+
+    box-shadow:none;
+
+}
+
+/* =====================================
+   ANSWER CARD
+===================================== */
+
+.answer-card{
+
+    background:white;
+
+    border-radius:22px;
+
+    border:1px solid #E2E8F0;
+
+    padding:35px;
+
+    transition:.3s;
+
+}
+
+.answer-card:hover{
+
+    box-shadow:
+    0 10px 30px rgba(15,23,42,.05);
+
+}
+
+.answer-header{
+
+    margin-bottom:20px;
+
+}
+
+.answer-header h3{
+
+    font-size:22px;
+
+    color:#0F172A;
+
+}
+
+.answer-empty{
+
+    text-align:center;
+
+    padding:30px;
+
+}
+
+.answer-empty svg{
+
+    font-size:46px;
+
+    color:#2563EB;
+
+    margin-bottom:16px;
+
+}
+
+.answer-empty h3{
+
+    color:#0F172A;
+
+    margin-bottom:10px;
+
+    font-size:22px;
+
+}
+
+.answer-empty p{
+
+    color:#64748B;
+
+    line-height:1.7;
+
+}
+
+/* =====================================
+   CITATIONS
+===================================== */
+
+.citation-box{
+
+    margin-top:24px;
+
+    padding:24px;
+
+    border-radius:18px;
+
+    background:#F8FAFC;
+
+    border:1px solid #E2E8F0;
+
+    transition:.3s;
+
+}
+
+.citation-box:hover{
+
+    border-color:#BFDBFE;
+
+}
+
+.citation-title{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    margin-bottom:12px;
+
+    font-weight:700;
+
+    color:#0F172A;
+
+}
+
+.citation-title svg{
+
+    color:#2563EB;
+
+}
+
+.citation-box p{
+
+    color:#64748B;
+
+}
+
+/* =====================================
+   MOBILE
+===================================== */
+
+@media(max-width:768px){
+
+.chat-section{
+
+    padding:25px;
+
+}
+
+.chat-header h2{
+
+    font-size:28px;
+
+}
+
+.chat-input-wrapper{
+
+    flex-direction:column;
+
+}
+
+.ask-btn{
+
+    height:55px;
+
+    width:100%;
+
+}
+
+.answer-card{
+
+    padding:25px;
+
+}
+
+.citation-box{
+
+    padding:20px;
+
+}
+
+}
