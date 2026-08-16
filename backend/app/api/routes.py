@@ -32,6 +32,8 @@ from ..vector_db import (
     ImageRetrievalService,
 )
 
+from ..agents.graph import graph
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -798,56 +800,37 @@ async def query_documents(
     request: QueryRequest
 ):
     """
-    Ask a question and retrieve
-    relevant document context.
+    Ask a question and generate an AI answer
+    using the LangGraph workflow.
     """
 
     try:
+        state = {
+            "query": request.question,
+            "response": None,
+            "documents": [],
+            "images": [],
+            "citations": [],
+            "next_agent": None,
+        }
 
-        retrieval_res = (
-            retrieval_service.retrieve(
-
-                query=request.question,
-
-                top_k=request.top_k or 5,
-
-                document_id=request.document_id,
-            )
-        )
+        result = graph.invoke(state)
 
         return QueryResponse(
-
             question=request.question,
-
-            answer=(
-                "Retrieved relevant chunks. "
-                "AI Agent synthesis ready."
-            ),
-
-            sources=retrieval_res[
-                "chunks"
-            ],
-
-            rag_context=retrieval_res[
-                "rag_context"
-            ],
+            answer=result.get("response") or "No answer generated.",
+            sources=result.get("citations", []),
         )
 
     except Exception as e:
-
         logger.error(
-            f"Query endpoint failed: {e}"
+            f"Query endpoint failed: {e}",
+            exc_info=True
         )
 
         return QueryResponse(
-
             question=request.question,
-
-            answer=(
-                f"Error executing retrieval: "
-                f"{str(e)}"
-            ),
-
+            answer=f"Error executing query: {str(e)}",
             sources=[],
         )
 
