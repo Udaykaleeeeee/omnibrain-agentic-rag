@@ -12,13 +12,14 @@ logger = logging.getLogger(__name__)
 
 class ImageEmbeddingModel:
     """
-    Generate image embeddings using OpenCLIP.
+    Generate image and text embeddings using OpenCLIP.
 
     Supports:
     - image file paths
     - PIL Images
     - image bytes
     - list/tuple of the above
+    - text queries for image similarity retrieval
     """
 
     def __init__(
@@ -174,10 +175,74 @@ class ImageEmbeddingModel:
             "bytes, list, or tuple."
         )
 
+    def encode_text(self, texts):
+        """
+        Generate OpenCLIP text embeddings for image similarity retrieval.
+
+        The generated text embeddings are normalized and share
+        the same embedding space as the image embeddings.
+
+        Args:
+            texts:
+                A single text query or a list/tuple of text queries.
+
+        Returns:
+            List of normalized text embedding vectors.
+        """
+
+        # Convert single text query into a list
+        if isinstance(texts, str):
+            texts = [texts]
+
+        if not isinstance(texts, (list, tuple)):
+            raise TypeError(
+                "texts must be a string, list, or tuple."
+            )
+
+        if not texts:
+            return []
+
+        # Validate that all inputs are strings
+        if not all(isinstance(text, str) for text in texts):
+            raise TypeError(
+                "All text queries must be strings."
+            )
+
+        try:
+            # OpenCLIP tokenizer
+            tokenizer = open_clip.get_tokenizer(
+                self.model_name
+            )
+
+            # Tokenize text queries
+            tokens = tokenizer(
+                list(texts)
+            ).to(self.device)
+
+            # Generate text embeddings
+            with torch.no_grad():
+                embeddings = self.model.encode_text(
+                    tokens
+                )
+
+            # L2 normalize embeddings
+            embeddings = embeddings / embeddings.norm(
+                dim=-1,
+                keepdim=True,
+            )
+
+            return embeddings.cpu().numpy().tolist()
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to generate text embedding: {e}"
+            ) from e
+
 
 if __name__ == "__main__":
     model = ImageEmbeddingModel()
 
+    # Test image embedding
     image_path = "sample.jpg"
 
     vectors = model.encode(image_path)
@@ -187,5 +252,14 @@ if __name__ == "__main__":
     )
 
     logger.info(
-        f"Embedding dimension: {len(vectors[0])}"
+        f"Image embedding dimension: {len(vectors[0])}"
+    )
+
+    # Test text embedding
+    text_vectors = model.encode_text(
+        "financial revenue chart"
+    )
+
+    logger.info(
+        f"Text embedding dimension: {len(text_vectors[0])}"
     )
