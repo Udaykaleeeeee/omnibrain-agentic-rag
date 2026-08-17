@@ -811,6 +811,8 @@ async def query_documents(
             "documents": [],
             "images": [],
             "citations": [],
+            "document_id": request.document_id,
+            "top_k": request.top_k or 5,
             "next_agent": None,
         }
 
