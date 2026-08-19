@@ -1,14 +1,31 @@
-from PIL import Image
-import open_clip
-import torch
-import os
-import logging
-import io
+"""
+Image Embedding Model
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+Generates image and text embeddings using OpenCLIP.
+
+Important:
+The heavy OpenCLIP and PyTorch libraries are lazy-loaded.
+This helps reduce memory usage during FastAPI startup,
+especially on low-memory deployment environments.
+"""
+
+import io
+import logging
+import os
+
+from PIL import Image
+
+
+# ------------------------------------------------------------
+# Logging
+# ------------------------------------------------------------
+
 logger = logging.getLogger(__name__)
 
+
+# ------------------------------------------------------------
+# IMAGE EMBEDDING MODEL
+# ------------------------------------------------------------
 
 class ImageEmbeddingModel:
     """
@@ -18,100 +35,226 @@ class ImageEmbeddingModel:
     - image file paths
     - PIL Images
     - image bytes
-    - list/tuple of the above
+    - lists/tuples of images
     - text queries for image similarity retrieval
+
+    OpenCLIP and PyTorch are loaded only when an embedding
+    operation is actually requested.
     """
 
     def __init__(
         self,
         model_name="ViT-B-32",
         pretrained="laion2b_s34b_b79k",
+        embedding_dimension=512,
     ):
-        logger.info("Loading OpenCLIP model...")
+        # ----------------------------------------------------
+        # Model configuration
+        # ----------------------------------------------------
 
         self.model_name = model_name
         self.pretrained = pretrained
+        self.embedding_dimension = embedding_dimension
 
-        self.device = (
-            "cuda"
-            if torch.cuda.is_available()
-            else "cpu"
-        )
+        # ----------------------------------------------------
+        # Lazy-loaded objects
+        # ----------------------------------------------------
 
-        self.model, _, self.preprocess = (
-            open_clip.create_model_and_transforms(
-                model_name,
-                pretrained=pretrained,
-            )
-        )
+        self.model = None
+        self.preprocess = None
+        self.device = None
 
-        self.model.to(self.device)
-        self.model.eval()
+        self.torch = None
+        self.open_clip = None
+
+        self._model_loaded = False
 
         logger.info(
-            f"OpenCLIP model loaded successfully: "
-            f"{self.model_name}"
+            "ImageEmbeddingModel initialized. "
+            "OpenCLIP will load only when required."
         )
+
+    # --------------------------------------------------------
+    # LAZY MODEL LOADING
+    # --------------------------------------------------------
+
+    def _ensure_model_loaded(self):
+        """
+        Load PyTorch and OpenCLIP only when image/text
+        embedding functionality is actually used.
+        """
+
+        if self._model_loaded:
+            return
+
+        logger.info(
+            "Loading OpenCLIP model on demand..."
+        )
+
+        try:
+            # Heavy imports happen only here
+            import torch
+            import open_clip
+
+            self.torch = torch
+            self.open_clip = open_clip
+
+            # ----------------------------------------------
+            # Device
+            # ----------------------------------------------
+
+            self.device = (
+                "cuda"
+                if self.torch.cuda.is_available()
+                else "cpu"
+            )
+
+            # ----------------------------------------------
+            # Load model and preprocessing pipeline
+            # ----------------------------------------------
+
+            (
+                self.model,
+                _,
+                self.preprocess,
+            ) = self.open_clip.create_model_and_transforms(
+                self.model_name,
+                pretrained=self.pretrained,
+            )
+
+            self.model.to(self.device)
+            self.model.eval()
+
+            # ----------------------------------------------
+            # Update embedding dimension if available
+            # ----------------------------------------------
+
+            if hasattr(self.model, "visual"):
+                if hasattr(
+                    self.model.visual,
+                    "output_dim",
+                ):
+                    self.embedding_dimension = (
+                        self.model.visual.output_dim
+                    )
+
+            self._model_loaded = True
+
+            logger.info(
+                f"OpenCLIP model loaded successfully: "
+                f"{self.model_name} on {self.device}"
+            )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to load OpenCLIP model: {e}",
+                exc_info=True,
+            )
+
+            raise RuntimeError(
+                f"Unable to load OpenCLIP model: {e}"
+            ) from e
+
+    # --------------------------------------------------------
+    # EMBEDDING DIMENSION
+    # --------------------------------------------------------
 
     def get_embedding_dimension(self):
         """
-        Return the dimensionality of the image embedding.
+        Return image embedding dimension.
+
+        ViT-B-32 uses 512-dimensional vectors.
+        Returning the configured dimension avoids loading
+        the entire model just to obtain this value.
         """
-        return self.model.visual.output_dim
+
+        return self.embedding_dimension
+
+    # --------------------------------------------------------
+    # IMAGE LOADING
+    # --------------------------------------------------------
 
     def _load_image(self, image):
         """
-        Convert different image input types into a PIL Image.
+        Convert supported image input types into a PIL image.
 
         Supported:
-        - PIL Image
-        - bytes
+        - PIL.Image.Image
+        - raw bytes
         - file path
         """
 
+        # ----------------------------------------------------
         # PIL Image
+        # ----------------------------------------------------
+
         if isinstance(image, Image.Image):
             return image.convert("RGB")
 
-        # Image bytes
+        # ----------------------------------------------------
+        # Raw bytes
+        # ----------------------------------------------------
+
         if isinstance(image, bytes):
             try:
                 return Image.open(
                     io.BytesIO(image)
                 ).convert("RGB")
+
             except Exception as e:
                 raise ValueError(
                     f"Invalid image bytes: {e}"
                 ) from e
 
+        # ----------------------------------------------------
         # File path
-        if isinstance(image, (str, os.PathLike)):
+        # ----------------------------------------------------
+
+        if isinstance(
+            image,
+            (str, os.PathLike),
+        ):
             image_path = os.fspath(image)
 
             if not os.path.exists(image_path):
                 raise FileNotFoundError(
-                    f"Image file '{image_path}' not found."
+                    f"Image file "
+                    f"'{image_path}' not found."
                 )
 
             try:
                 return Image.open(
                     image_path
                 ).convert("RGB")
+
             except Exception as e:
                 raise ValueError(
-                    f"Could not open image '{image_path}': {e}"
+                    f"Could not open image "
+                    f"'{image_path}': {e}"
                 ) from e
+
+        # ----------------------------------------------------
+        # Unsupported input
+        # ----------------------------------------------------
 
         raise TypeError(
             "Unsupported image input type: "
-            f"{type(image)}. Expected a file path, "
-            "PIL Image, or image bytes."
+            f"{type(image)}. "
+            "Expected a file path, PIL Image, "
+            "or image bytes."
         )
+
+    # --------------------------------------------------------
+    # SINGLE IMAGE EMBEDDING
+    # --------------------------------------------------------
 
     def _encode_single(self, image):
         """
         Generate an embedding for a single image.
         """
+
+        # Load model only when actually needed
+        self._ensure_model_loaded()
 
         try:
             pil_image = self._load_image(image)
@@ -122,23 +265,42 @@ class ImageEmbeddingModel:
                 .to(self.device)
             )
 
-            with torch.no_grad():
-                embedding = self.model.encode_image(
-                    processed_image
+            with self.torch.no_grad():
+
+                embedding = (
+                    self.model.encode_image(
+                        processed_image
+                    )
                 )
 
-            # L2 normalize embedding
-            embedding = embedding / embedding.norm(
-                dim=-1,
-                keepdim=True,
+            # ------------------------------------------------
+            # L2 normalization
+            # ------------------------------------------------
+
+            embedding = (
+                embedding
+                / embedding.norm(
+                    dim=-1,
+                    keepdim=True,
+                )
             )
 
-            return embedding.cpu().numpy()[0].tolist()
+            return (
+                embedding
+                .cpu()
+                .numpy()[0]
+                .tolist()
+            )
 
         except Exception as e:
             raise RuntimeError(
-                f"Failed to generate image embedding: {e}"
+                f"Failed to generate "
+                f"image embedding: {e}"
             ) from e
+
+    # --------------------------------------------------------
+    # IMAGE EMBEDDING API
+    # --------------------------------------------------------
 
     def encode(self, images):
         """
@@ -154,112 +316,174 @@ class ImageEmbeddingModel:
         - list of embedding vectors
         """
 
+        # ----------------------------------------------------
         # Single image
+        # ----------------------------------------------------
+
         if isinstance(
             images,
-            (str, os.PathLike, bytes, Image.Image),
+            (
+                str,
+                os.PathLike,
+                bytes,
+                Image.Image,
+            ),
         ):
             return [
                 self._encode_single(images)
             ]
 
+        # ----------------------------------------------------
         # Multiple images
-        if isinstance(images, (list, tuple)):
+        # ----------------------------------------------------
+
+        if isinstance(
+            images,
+            (list, tuple),
+        ):
+
             return [
                 self._encode_single(image)
                 for image in images
             ]
 
         raise TypeError(
-            "images must be a file path, PIL Image, "
-            "bytes, list, or tuple."
+            "images must be a file path, "
+            "PIL Image, bytes, list, or tuple."
         )
+
+    # --------------------------------------------------------
+    # TEXT EMBEDDINGS FOR IMAGE SEARCH
+    # --------------------------------------------------------
 
     def encode_text(self, texts):
         """
-        Generate OpenCLIP text embeddings for image similarity retrieval.
+        Generate OpenCLIP text embeddings for
+        image similarity retrieval.
 
-        The generated text embeddings are normalized and share
-        the same embedding space as the image embeddings.
+        The text embeddings use the same vector space
+        as the image embeddings.
 
         Args:
             texts:
-                A single text query or a list/tuple of text queries.
+                Single string or list/tuple of strings.
 
         Returns:
-            List of normalized text embedding vectors.
+            List of normalized embedding vectors.
         """
 
-        # Convert single text query into a list
+        # ----------------------------------------------------
+        # Normalize input
+        # ----------------------------------------------------
+
         if isinstance(texts, str):
             texts = [texts]
 
-        if not isinstance(texts, (list, tuple)):
+        if not isinstance(
+            texts,
+            (list, tuple),
+        ):
             raise TypeError(
-                "texts must be a string, list, or tuple."
+                "texts must be a string, "
+                "list, or tuple."
             )
 
         if not texts:
             return []
 
-        # Validate that all inputs are strings
-        if not all(isinstance(text, str) for text in texts):
+        if not all(
+            isinstance(text, str)
+            for text in texts
+        ):
             raise TypeError(
                 "All text queries must be strings."
             )
 
+        # Load model only when text-image search is used
+        self._ensure_model_loaded()
+
         try:
-            # OpenCLIP tokenizer
-            tokenizer = open_clip.get_tokenizer(
-                self.model_name
+            # ------------------------------------------------
+            # Tokenizer
+            # ------------------------------------------------
+
+            tokenizer = (
+                self.open_clip.get_tokenizer(
+                    self.model_name
+                )
             )
 
-            # Tokenize text queries
             tokens = tokenizer(
                 list(texts)
             ).to(self.device)
 
-            # Generate text embeddings
-            with torch.no_grad():
-                embeddings = self.model.encode_text(
-                    tokens
+            # ------------------------------------------------
+            # Generate embeddings
+            # ------------------------------------------------
+
+            with self.torch.no_grad():
+
+                embeddings = (
+                    self.model.encode_text(
+                        tokens
+                    )
                 )
 
-            # L2 normalize embeddings
-            embeddings = embeddings / embeddings.norm(
-                dim=-1,
-                keepdim=True,
+            # ------------------------------------------------
+            # L2 normalization
+            # ------------------------------------------------
+
+            embeddings = (
+                embeddings
+                / embeddings.norm(
+                    dim=-1,
+                    keepdim=True,
+                )
             )
 
-            return embeddings.cpu().numpy().tolist()
+            return (
+                embeddings
+                .cpu()
+                .numpy()
+                .tolist()
+            )
 
         except Exception as e:
             raise RuntimeError(
-                f"Failed to generate text embedding: {e}"
+                f"Failed to generate "
+                f"text embedding: {e}"
             ) from e
 
 
+# ------------------------------------------------------------
+# LOCAL TEST
+# ------------------------------------------------------------
+
 if __name__ == "__main__":
+
     model = ImageEmbeddingModel()
 
-    # Test image embedding
-    image_path = "sample.jpg"
-
-    vectors = model.encode(image_path)
-
     logger.info(
-        f"Model: {model.model_name}"
+        f"Configured embedding dimension: "
+        f"{model.get_embedding_dimension()}"
     )
 
-    logger.info(
-        f"Image embedding dimension: {len(vectors[0])}"
-    )
-
-    # Test text embedding
-    text_vectors = model.encode_text(
-        "financial revenue chart"
-    )
-
-    logger.info(
-        f"Text embedding dimension: {len(text_vectors[0])}"
-    )
+    # Uncomment for local testing:
+    #
+    # image_path = "sample.jpg"
+    #
+    # vectors = model.encode(image_path)
+    #
+    # logger.info(
+    #     f"Image embedding dimension: "
+    #     f"{len(vectors[0])}"
+    # )
+    #
+    # text_vectors = model.encode_text(
+    #     "financial revenue chart"
+    # )
+    #
+    # logger.info(
+    #     f"Text embedding dimension: "
+    #     f"{len(text_vectors[0])}"
+    # )
