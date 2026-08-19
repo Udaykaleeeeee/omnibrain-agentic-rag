@@ -6,40 +6,53 @@ from backend.app.api.routes import router
 from backend.app.agents.graph import graph
 
 
+# ============================================================
+# FASTAPI APPLICATION
+# ============================================================
+
 app = FastAPI(
     title="OmniBrain",
     description="Multi-format document ingestion with OCR and Agentic RAG",
-    version="1.0.0"
+    version="1.0.0",
 )
 
 
-# -----------------------------
-# CORS Configuration
-# -----------------------------
+# ============================================================
+# CORS CONFIGURATION
+# ============================================================
+
 app.add_middleware(
     CORSMiddleware,
+
+    # Local React/Vite development
     allow_origins=[
         "http://localhost:5173",
+        "http://127.0.0.1:5173",
     ],
+
+    # Allow deployed Vercel frontend
+    allow_origin_regex=r"https://.*\.vercel\.app",
+
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# -----------------------------
-# API Routes
-# -----------------------------
-app.include_router(router, tags=["ingestion"])
+# ============================================================
+# API ROUTES
+# ============================================================
+
+app.include_router(
+    router,
+    tags=["ingestion"],
+)
 
 
-class QueryRequest(BaseModel):
-    query: str
+# ============================================================
+# BASIC ENDPOINTS
+# ============================================================
 
-
-# -----------------------------
-# Basic Endpoints
-# -----------------------------
 @app.get("/")
 def home():
     return {
@@ -54,11 +67,20 @@ def health():
     }
 
 
-# -----------------------------
-# LangGraph Agent Endpoint
-# -----------------------------
+# ============================================================
+# AGENT REQUEST
+# ============================================================
+
+class AgentRequest(BaseModel):
+    query: str
+
+
+# ============================================================
+# LANGGRAPH AGENT ENDPOINT
+# ============================================================
+
 @app.post("/agent")
-def run_agent(request: QueryRequest):
+def run_agent(request: AgentRequest):
     """
     Execute the LangGraph workflow.
     """
@@ -75,35 +97,13 @@ def run_agent(request: QueryRequest):
     result = graph.invoke(state)
 
     return {
-        "query": result["query"],
-        "response": result["response"],
-        "agent": result["next_agent"],
-        "citations": result["citations"],
+        "query": result.get("query", request.query),
+        "response": result.get("response"),
+        "agent": result.get("next_agent"),
+        "citations": result.get("citations", []),
     }
 
 
-# -----------------------------
-# Frontend Query Endpoint
-# -----------------------------
-@app.post("/query")
-def query(request: QueryRequest):
-    """
-    Frontend endpoint.
-    Uses the LangGraph workflow.
-    """
-
-    state = {
-        "query": request.query,
-        "response": None,
-        "documents": [],
-        "images": [],
-        "citations": [],
-        "next_agent": None,
-    }
-
-    result = graph.invoke(state)
-
-    return {
-        "answer": result["response"],
-        "citations": result["citations"],
-    }
+# NOTE:
+# POST /query is already implemented in backend.app.api.routes.
+# Do not define another /query endpoint here.
