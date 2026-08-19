@@ -3,10 +3,11 @@ Image Embedding Model
 
 Generates image and text embeddings using OpenCLIP.
 
-Important:
-The heavy OpenCLIP and PyTorch libraries are lazy-loaded.
-This helps reduce memory usage during FastAPI startup,
-especially on low-memory deployment environments.
+Heavy OpenCLIP/PyTorch dependencies are lazy-loaded.
+Image embeddings can also be disabled on low-memory
+cloud deployments using:
+
+DISABLE_IMAGE_EMBEDDINGS=true
 """
 
 import io
@@ -16,16 +17,8 @@ import os
 from PIL import Image
 
 
-# ------------------------------------------------------------
-# Logging
-# ------------------------------------------------------------
-
 logger = logging.getLogger(__name__)
 
-
-# ------------------------------------------------------------
-# IMAGE EMBEDDING MODEL
-# ------------------------------------------------------------
 
 class ImageEmbeddingModel:
     """
@@ -35,11 +28,8 @@ class ImageEmbeddingModel:
     - image file paths
     - PIL Images
     - image bytes
-    - lists/tuples of images
+    - list/tuple of images
     - text queries for image similarity retrieval
-
-    OpenCLIP and PyTorch are loaded only when an embedding
-    operation is actually requested.
     """
 
     def __init__(
@@ -48,17 +38,9 @@ class ImageEmbeddingModel:
         pretrained="laion2b_s34b_b79k",
         embedding_dimension=512,
     ):
-        # ----------------------------------------------------
-        # Model configuration
-        # ----------------------------------------------------
-
         self.model_name = model_name
         self.pretrained = pretrained
         self.embedding_dimension = embedding_dimension
-
-        # ----------------------------------------------------
-        # Lazy-loaded objects
-        # ----------------------------------------------------
 
         self.model = None
         self.preprocess = None
@@ -74,15 +56,34 @@ class ImageEmbeddingModel:
             "OpenCLIP will load only when required."
         )
 
-    # --------------------------------------------------------
+    # ========================================================
+    # CHECK IF IMAGE EMBEDDINGS ARE DISABLED
+    # ========================================================
+
+    def _disabled(self):
+        return (
+            os.getenv(
+                "DISABLE_IMAGE_EMBEDDINGS",
+                "false",
+            ).lower()
+            == "true"
+        )
+
+    # ========================================================
     # LAZY MODEL LOADING
-    # --------------------------------------------------------
+    # ========================================================
 
     def _ensure_model_loaded(self):
         """
-        Load PyTorch and OpenCLIP only when image/text
-        embedding functionality is actually used.
+        Load PyTorch and OpenCLIP only when required.
         """
+
+        if self._disabled():
+            logger.warning(
+                "Image embeddings are disabled "
+                "for low-memory deployment."
+            )
+            return
 
         if self._model_loaded:
             return
@@ -92,26 +93,17 @@ class ImageEmbeddingModel:
         )
 
         try:
-            # Heavy imports happen only here
             import torch
             import open_clip
 
             self.torch = torch
             self.open_clip = open_clip
 
-            # ----------------------------------------------
-            # Device
-            # ----------------------------------------------
-
             self.device = (
                 "cuda"
                 if self.torch.cuda.is_available()
                 else "cpu"
             )
-
-            # ----------------------------------------------
-            # Load model and preprocessing pipeline
-            # ----------------------------------------------
 
             (
                 self.model,
@@ -125,24 +117,22 @@ class ImageEmbeddingModel:
             self.model.to(self.device)
             self.model.eval()
 
-            # ----------------------------------------------
-            # Update embedding dimension if available
-            # ----------------------------------------------
-
-            if hasattr(self.model, "visual"):
-                if hasattr(
+            if (
+                hasattr(self.model, "visual")
+                and hasattr(
                     self.model.visual,
                     "output_dim",
-                ):
-                    self.embedding_dimension = (
-                        self.model.visual.output_dim
-                    )
+                )
+            ):
+                self.embedding_dimension = (
+                    self.model.visual.output_dim
+                )
 
             self._model_loaded = True
 
             logger.info(
                 f"OpenCLIP model loaded successfully: "
-                f"{self.model_name} on {self.device}"
+                f"{self.model_name}"
             )
 
         except Exception as e:
@@ -155,45 +145,24 @@ class ImageEmbeddingModel:
                 f"Unable to load OpenCLIP model: {e}"
             ) from e
 
-    # --------------------------------------------------------
+    # ========================================================
     # EMBEDDING DIMENSION
-    # --------------------------------------------------------
+    # ========================================================
 
     def get_embedding_dimension(self):
-        """
-        Return image embedding dimension.
-
-        ViT-B-32 uses 512-dimensional vectors.
-        Returning the configured dimension avoids loading
-        the entire model just to obtain this value.
-        """
-
         return self.embedding_dimension
 
-    # --------------------------------------------------------
-    # IMAGE LOADING
-    # --------------------------------------------------------
+    # ========================================================
+    # LOAD IMAGE
+    # ========================================================
 
     def _load_image(self, image):
         """
-        Convert supported image input types into a PIL image.
-
-        Supported:
-        - PIL.Image.Image
-        - raw bytes
-        - file path
+        Convert supported inputs into a PIL Image.
         """
-
-        # ----------------------------------------------------
-        # PIL Image
-        # ----------------------------------------------------
 
         if isinstance(image, Image.Image):
             return image.convert("RGB")
-
-        # ----------------------------------------------------
-        # Raw bytes
-        # ----------------------------------------------------
 
         if isinstance(image, bytes):
             try:
@@ -206,10 +175,6 @@ class ImageEmbeddingModel:
                     f"Invalid image bytes: {e}"
                 ) from e
 
-        # ----------------------------------------------------
-        # File path
-        # ----------------------------------------------------
-
         if isinstance(
             image,
             (str, os.PathLike),
@@ -218,8 +183,7 @@ class ImageEmbeddingModel:
 
             if not os.path.exists(image_path):
                 raise FileNotFoundError(
-                    f"Image file "
-                    f"'{image_path}' not found."
+                    f"Image file '{image_path}' not found."
                 )
 
             try:
@@ -233,28 +197,25 @@ class ImageEmbeddingModel:
                     f"'{image_path}': {e}"
                 ) from e
 
-        # ----------------------------------------------------
-        # Unsupported input
-        # ----------------------------------------------------
-
         raise TypeError(
-            "Unsupported image input type: "
-            f"{type(image)}. "
-            "Expected a file path, PIL Image, "
+            "Unsupported image input type. "
+            "Expected file path, PIL Image, "
             "or image bytes."
         )
 
-    # --------------------------------------------------------
+    # ========================================================
     # SINGLE IMAGE EMBEDDING
-    # --------------------------------------------------------
+    # ========================================================
 
     def _encode_single(self, image):
         """
-        Generate an embedding for a single image.
+        Generate embedding for one image.
         """
 
-        # Load model only when actually needed
         self._ensure_model_loaded()
+
+        if self._disabled():
+            return None
 
         try:
             pil_image = self._load_image(image)
@@ -272,10 +233,6 @@ class ImageEmbeddingModel:
                         processed_image
                     )
                 )
-
-            # ------------------------------------------------
-            # L2 normalization
-            # ------------------------------------------------
 
             embedding = (
                 embedding
@@ -298,27 +255,24 @@ class ImageEmbeddingModel:
                 f"image embedding: {e}"
             ) from e
 
-    # --------------------------------------------------------
-    # IMAGE EMBEDDING API
-    # --------------------------------------------------------
+    # ========================================================
+    # IMAGE ENCODE
+    # ========================================================
 
     def encode(self, images):
         """
         Generate image embeddings.
-
-        Accepts:
-        - one image path
-        - one PIL Image
-        - one image as bytes
-        - list/tuple of images
-
-        Returns:
-        - list of embedding vectors
         """
 
-        # ----------------------------------------------------
-        # Single image
-        # ----------------------------------------------------
+        # IMPORTANT FOR RENDER FREE
+        if self._disabled():
+
+            logger.warning(
+                "Image embedding generation skipped "
+                "because DISABLE_IMAGE_EMBEDDINGS=true."
+            )
+
+            return []
 
         if isinstance(
             images,
@@ -329,52 +283,52 @@ class ImageEmbeddingModel:
                 Image.Image,
             ),
         ):
-            return [
-                self._encode_single(images)
-            ]
+            vector = self._encode_single(images)
 
-        # ----------------------------------------------------
-        # Multiple images
-        # ----------------------------------------------------
+            return (
+                [vector]
+                if vector is not None
+                else []
+            )
 
         if isinstance(
             images,
             (list, tuple),
         ):
+            vectors = []
 
-            return [
-                self._encode_single(image)
-                for image in images
-            ]
+            for image in images:
+                vector = self._encode_single(image)
+
+                if vector is not None:
+                    vectors.append(vector)
+
+            return vectors
 
         raise TypeError(
             "images must be a file path, "
             "PIL Image, bytes, list, or tuple."
         )
 
-    # --------------------------------------------------------
-    # TEXT EMBEDDINGS FOR IMAGE SEARCH
-    # --------------------------------------------------------
+    # ========================================================
+    # TEXT ENCODE FOR IMAGE SEARCH
+    # ========================================================
 
     def encode_text(self, texts):
         """
-        Generate OpenCLIP text embeddings for
-        image similarity retrieval.
-
-        The text embeddings use the same vector space
-        as the image embeddings.
-
-        Args:
-            texts:
-                Single string or list/tuple of strings.
-
-        Returns:
-            List of normalized embedding vectors.
+        Generate OpenCLIP text embeddings
+        for image similarity retrieval.
         """
 
-        # ----------------------------------------------------
-        # Normalize input
-        # ----------------------------------------------------
+        # IMPORTANT FOR RENDER FREE
+        if self._disabled():
+
+            logger.warning(
+                "Image search embedding skipped "
+                "because DISABLE_IMAGE_EMBEDDINGS=true."
+            )
+
+            return []
 
         if isinstance(texts, str):
             texts = [texts]
@@ -399,14 +353,9 @@ class ImageEmbeddingModel:
                 "All text queries must be strings."
             )
 
-        # Load model only when text-image search is used
         self._ensure_model_loaded()
 
         try:
-            # ------------------------------------------------
-            # Tokenizer
-            # ------------------------------------------------
-
             tokenizer = (
                 self.open_clip.get_tokenizer(
                     self.model_name
@@ -417,10 +366,6 @@ class ImageEmbeddingModel:
                 list(texts)
             ).to(self.device)
 
-            # ------------------------------------------------
-            # Generate embeddings
-            # ------------------------------------------------
-
             with self.torch.no_grad():
 
                 embeddings = (
@@ -428,10 +373,6 @@ class ImageEmbeddingModel:
                         tokens
                     )
                 )
-
-            # ------------------------------------------------
-            # L2 normalization
-            # ------------------------------------------------
 
             embeddings = (
                 embeddings
@@ -455,35 +396,11 @@ class ImageEmbeddingModel:
             ) from e
 
 
-# ------------------------------------------------------------
-# LOCAL TEST
-# ------------------------------------------------------------
-
 if __name__ == "__main__":
 
     model = ImageEmbeddingModel()
 
-    logger.info(
-        f"Configured embedding dimension: "
-        f"{model.get_embedding_dimension()}"
+    print(
+        "Configured image embedding dimension:",
+        model.get_embedding_dimension(),
     )
-
-    # Uncomment for local testing:
-    #
-    # image_path = "sample.jpg"
-    #
-    # vectors = model.encode(image_path)
-    #
-    # logger.info(
-    #     f"Image embedding dimension: "
-    #     f"{len(vectors[0])}"
-    # )
-    #
-    # text_vectors = model.encode_text(
-    #     "financial revenue chart"
-    # )
-    #
-    # logger.info(
-    #     f"Text embedding dimension: "
-    #     f"{len(text_vectors[0])}"
-    # )

@@ -1,27 +1,22 @@
 """
-Text Embedding Model
+Lightweight Text Embedding Model for OmniBrain.
 
-Generates semantic text embeddings using
-BAAI/bge-small-en-v1.5.
-
-The SentenceTransformer model is lazy-loaded so that
-FastAPI can start without immediately loading the heavy
-PyTorch/Transformers stack.
+Uses Qdrant FastEmbed with BAAI/bge-small-en-v1.5.
+FastEmbed uses ONNX instead of the heavier
+SentenceTransformers/PyTorch stack.
 """
 
 import logging
 from typing import List
-
 
 logger = logging.getLogger(__name__)
 
 
 class TextEmbeddingModel:
     """
-    Wrapper around SentenceTransformer for generating
-    normalized text embeddings.
+    Lightweight wrapper around FastEmbed.
 
-    The actual model is loaded only when encode()
+    The model is lazy-loaded only when encode()
     is called for the first time.
     """
 
@@ -33,97 +28,72 @@ class TextEmbeddingModel:
         self.model_name = model_name
         self.embedding_dimension = embedding_dimension
 
-        # Model is NOT loaded during FastAPI startup
         self.model = None
         self._model_loaded = False
 
         logger.info(
             "TextEmbeddingModel initialized. "
-            "BGE model will load only when required."
+            "FastEmbed will load only when required."
         )
-
-    # --------------------------------------------------------
-    # LAZY MODEL LOADING
-    # --------------------------------------------------------
 
     def _ensure_model_loaded(self):
         """
-        Load SentenceTransformer only when embeddings
-        are actually requested.
+        Lazy-load FastEmbed model.
         """
 
         if self._model_loaded:
             return
 
         logger.info(
-            f"Loading text embedding model on demand: "
+            f"Loading FastEmbed model on demand: "
             f"{self.model_name}"
         )
 
         try:
-            # Heavy dependency imported only when required
-            from sentence_transformers import SentenceTransformer
+            from fastembed import TextEmbedding
 
-            self.model = SentenceTransformer(
-                self.model_name
+            self.model = TextEmbedding(
+                model_name=self.model_name,
+                lazy_load=True,
             )
 
             self._model_loaded = True
 
             logger.info(
-                f"Text embedding model loaded successfully: "
+                f"FastEmbed model ready: "
                 f"{self.model_name}"
             )
 
         except Exception as e:
             logger.error(
-                f"Failed to load text embedding model: {e}",
+                f"Failed to initialize FastEmbed: {e}",
                 exc_info=True,
             )
 
             raise RuntimeError(
-                f"Unable to load text embedding model: {e}"
+                f"Unable to initialize text embedding model: {e}"
             ) from e
-
-    # --------------------------------------------------------
-    # EMBEDDING DIMENSION
-    # --------------------------------------------------------
 
     def get_embedding_dimension(self) -> int:
         """
-        Return configured embedding dimension without
-        loading the full model.
-
-        BAAI/bge-small-en-v1.5 produces 384-dimensional
-        vectors.
+        BGE-small-en-v1.5 uses 384-dimensional vectors.
         """
 
         return self.embedding_dimension
-
-    # --------------------------------------------------------
-    # TEXT ENCODING
-    # --------------------------------------------------------
 
     def encode(
         self,
         texts: List[str],
     ) -> List[List[float]]:
         """
-        Generate normalized embeddings for text.
-
-        Args:
-            texts:
-                List of text strings.
-
-        Returns:
-            List of embedding vectors.
+        Generate text embeddings.
         """
-
-        if not texts:
-            return []
 
         if isinstance(texts, str):
             texts = [texts]
+
+        if not texts:
+            return []
 
         if not isinstance(texts, (list, tuple)):
             raise TypeError(
@@ -138,22 +108,41 @@ class TextEmbeddingModel:
                 "All text inputs must be strings."
             )
 
-        # Load BGE only when embedding is actually needed
         self._ensure_model_loaded()
 
         try:
-            embeddings = self.model.encode(
-                list(texts),
-                batch_size=16,
-                show_progress_bar=False,
-                normalize_embeddings=True,
+            embeddings = list(
+                self.model.embed(
+                    list(texts),
+                    batch_size=4,
+                    parallel=None,
+                )
             )
 
-            return embeddings.tolist()
+            vectors = []
+
+            for embedding in embeddings:
+                vector = embedding.tolist()
+
+                # Normalize vector
+                norm = sum(
+                    value * value
+                    for value in vector
+                ) ** 0.5
+
+                if norm > 0:
+                    vector = [
+                        value / norm
+                        for value in vector
+                    ]
+
+                vectors.append(vector)
+
+            return vectors
 
         except Exception as e:
             logger.error(
-                f"Failed to generate text embeddings: {e}",
+                f"Text embedding generation failed: {e}",
                 exc_info=True,
             )
 
@@ -161,10 +150,6 @@ class TextEmbeddingModel:
                 f"Failed to generate text embeddings: {e}"
             ) from e
 
-
-# ------------------------------------------------------------
-# LOCAL TEST
-# ------------------------------------------------------------
 
 if __name__ == "__main__":
 
@@ -177,12 +162,5 @@ if __name__ == "__main__":
 
     vectors = model.encode(sample)
 
-    print(
-        "Number of embeddings:",
-        len(vectors),
-    )
-
-    print(
-        "Embedding dimension:",
-        len(vectors[0]),
-    )
+    print("Number of embeddings:", len(vectors))
+    print("Embedding dimension:", len(vectors[0]))
