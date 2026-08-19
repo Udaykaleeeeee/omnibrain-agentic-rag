@@ -5,7 +5,9 @@ from typing import Optional, List, Union, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from pydantic import BaseModel
+
 from ..agents.llm import get_llm
+from ..agents.graph import graph
 
 from ..ingestion import (
     ingest_document,
@@ -31,8 +33,6 @@ from ..vector_db import (
     QdrantService,
     ImageRetrievalService,
 )
-
-from ..agents.graph import graph
 
 logger = logging.getLogger(__name__)
 
@@ -800,11 +800,21 @@ async def query_documents(
     request: QueryRequest
 ):
     """
-    Ask a question and generate an AI answer
-    using the LangGraph workflow.
+    Ask a question using the LangGraph
+    Agentic RAG workflow.
+
+    The query is passed to the LangGraph
+    workflow, which routes the query to the
+    appropriate agent and returns the
+    generated AI response.
     """
 
     try:
+
+        # ----------------------------------------------------
+        # Build LangGraph state
+        # ----------------------------------------------------
+
         state = {
             "query": request.question,
             "response": None,
@@ -814,24 +824,58 @@ async def query_documents(
             "next_agent": None,
         }
 
+        # ----------------------------------------------------
+        # Run LangGraph workflow
+        # ----------------------------------------------------
+
         result = graph.invoke(state)
 
+        # ----------------------------------------------------
+        # Get generated response
+        # ----------------------------------------------------
+
+        answer = result.get(
+            "response"
+        )
+
+        if not answer:
+
+            answer = (
+                "The agent workflow completed "
+                "but did not generate a response."
+            )
+
+        # ----------------------------------------------------
+        # Return actual AI-generated answer
+        # ----------------------------------------------------
+
         return QueryResponse(
+
             question=request.question,
-            answer=result.get("response") or "No answer generated.",
-            sources=result.get("citations", []),
+
+            answer=answer,
+
+            sources=result.get(
+                "citations",
+                []
+            ),
+
+            rag_context=None,
         )
 
     except Exception as e:
+
         logger.error(
             f"Query endpoint failed: {e}",
             exc_info=True
         )
 
-        return QueryResponse(
-            question=request.question,
-            answer=f"Error executing query: {str(e)}",
-            sources=[],
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Query processing failed: "
+                f"{str(e)}"
+            )
         )
 
 
@@ -863,37 +907,79 @@ class MemoResponse(BaseModel):
 # GENERATE MEMO
 # ============================================================
 
-@router.post("/generate-memo", response_model=MemoResponse)
-async def generate_memo(request: MemoRequest):
-    if not request.document_id or request.document_id.strip() == "":
-        raise HTTPException(status_code=400, detail="Document ID cannot be empty")
+@router.post(
+    "/generate-memo",
+    response_model=MemoResponse
+)
+async def generate_memo(
+    request: MemoRequest
+):
+
+    if (
+        not request.document_id
+        or request.document_id.strip() == ""
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail="Document ID cannot be empty"
+        )
 
     try:
+
         retrieval_result = retrieval_service.retrieve(
-            query=request.focus_area or "Provide a comprehensive summary of the document.",
+
+            query=(
+                request.focus_area
+                or
+                "Provide a comprehensive summary "
+                "of the document."
+            ),
+
             top_k=10,
+
             document_id=request.document_id,
+
             enable_hybrid=False,
         )
 
-        chunks = retrieval_result.get("chunks", [])
+        chunks = retrieval_result.get(
+            "chunks",
+            []
+        )
 
         if not chunks:
+
             raise HTTPException(
                 status_code=404,
-                detail=f"No chunks found for document {request.document_id}"
+                detail=(
+                    f"No chunks found for document "
+                    f"{request.document_id}"
+                )
             )
 
         context = "\n\n".join(
-            chunk.get("text", "")
+
+            chunk.get(
+                "text",
+                ""
+            )
+
             for chunk in chunks
+
             if chunk.get("text")
         )
 
-        focus = request.focus_area or "Provide a comprehensive summary of the document."
+        focus = (
+            request.focus_area
+            or
+            "Provide a comprehensive summary "
+            "of the document."
+        )
 
         prompt = f"""
-Generate a concise but useful memo based only on the document context below.
+Generate a concise but useful memo based only
+on the document context below.
 
 Focus:
 {focus}
@@ -903,20 +989,35 @@ Document Context:
 """
 
         model = get_llm()
-        response = model.generate_content(prompt)
+
+        response = model.generate_content(
+            prompt
+        )
 
         return MemoResponse(
+
             document_id=request.document_id,
+
             memo=response.text,
+
             status="completed"
         )
 
     except HTTPException:
+
         raise
 
     except Exception as e:
-        logger.error(f"Memo generation failed: {e}", exc_info=True)
+
+        logger.error(
+            f"Memo generation failed: {e}",
+            exc_info=True
+        )
+
         raise HTTPException(
             status_code=500,
-            detail=f"Memo generation failed: {str(e)}"
+            detail=(
+                f"Memo generation failed: "
+                f"{str(e)}"
+            )
         )

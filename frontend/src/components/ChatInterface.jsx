@@ -11,6 +11,7 @@ import { askQuestion } from "../services/api";
 function ChatInterface() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
+  const [citations, setCitations] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const handleAsk = async () => {
@@ -18,15 +19,19 @@ function ChatInterface() {
 
     try {
       setLoading(true);
+      setAnswer("");
+      setCitations([]);
 
       const response = await askQuestion(question);
 
-      setAnswer(response.data.answer);
+      setAnswer(response.data.answer || "No answer returned.");
+      setCitations(response.data.sources || []);
 
     } catch (error) {
       console.error("Query Error:", error);
 
       setAnswer("Failed to retrieve answer.");
+      setCitations([]);
     } finally {
       setLoading(false);
     }
@@ -58,7 +63,7 @@ function ChatInterface() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && question.trim()) {
+            if (e.key === "Enter" && question.trim() && !loading) {
               handleAsk();
             }
           }}
@@ -115,7 +120,48 @@ function ChatInterface() {
 
         </div>
 
-        <p>No citations available yet.</p>
+        {citations.length > 0 ? (
+
+          <div className="citation-list">
+
+            {citations.map((citation, index) => (
+
+              <div
+                className="citation-item"
+                key={citation.point_id || index}
+              >
+                <strong>
+                  {citation.citation_tag ||
+                    `Reference ${index + 1}`}
+                </strong>
+
+                <p>
+                  Document: {citation.filename || "Unknown document"}
+                </p>
+
+                <p>
+                  Page: {citation.page_number ?? "N/A"} | Chunk:{" "}
+                  {citation.chunk_index ?? "N/A"}
+                </p>
+
+                {citation.score !== undefined && (
+                  <p>
+                    Similarity Score:{" "}
+                    {Number(citation.score).toFixed(3)}
+                  </p>
+                )}
+
+              </div>
+
+            ))}
+
+          </div>
+
+        ) : (
+
+          <p>No citations available yet.</p>
+
+        )}
 
       </div>
 

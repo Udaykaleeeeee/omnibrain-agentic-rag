@@ -23,6 +23,7 @@ export const uploadDocument = (formData, onUploadProgress) => {
 export const checkHealth = () => {
   return api.get("/health");
 };
+
 export const checkBackend = checkHealth;
 
 // =========================
@@ -43,11 +44,13 @@ export const deleteDocument = (documentId) => {
   return api.delete(`/documents/${documentId}`);
 };
 
-
+// =========================
+// Ask Question / AI Query
+// =========================
 export const askQuestion = (question) => {
   return api.post("/query", {
-    question,
-    top_k: 5,
+    question: question,
   });
 };
+
 export default api;
