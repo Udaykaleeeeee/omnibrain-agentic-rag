@@ -50,4 +50,4 @@ altair==5.5.0
 faiss-cpu==1.12.0
 opencv-python==4.12.0.88
 openpyxl==3.1.5
-python-pptx==1.0.2
+open-clip-torch==2.0.2
