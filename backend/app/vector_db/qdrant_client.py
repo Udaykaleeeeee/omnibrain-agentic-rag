@@ -5,6 +5,7 @@ Handles storing and retrieving text and image embeddings with metadata filtering
 
 import logging
 import uuid
+import os
 from typing import List, Dict, Any, Optional, Union
 
 from qdrant_client import QdrantClient
@@ -39,32 +40,91 @@ class QdrantService:
         image_vector_size: int = 512,
         prefer_grpc: bool = False,
         location: Optional[str] = None,
+        url: Optional[str] = None,
+        api_key: Optional[str] = None,
     ):
         self.collection_name = collection_name
         self.image_collection_name = image_collection_name
         self.vector_size = vector_size
         self.image_vector_size = image_vector_size
 
+        # Read Qdrant Cloud credentials from environment variables
+        qdrant_url = url or os.getenv("QDRANT_URL")
+        qdrant_api_key = api_key or os.getenv("QDRANT_API_KEY")
+
+        # Local Qdrant settings
+        qdrant_host = os.getenv("QDRANT_HOST", host)
+        qdrant_port = int(os.getenv("QDRANT_PORT", str(port)))
+
+        # --------------------------------------------------------
+        # In-memory Qdrant
+        # --------------------------------------------------------
         if location:
             self.client = QdrantClient(location=location)
-            logger.info(f"Initialized QdrantClient with location='{location}'")
+            logger.info(
+                f"Initialized QdrantClient with location='{location}'"
+            )
+
+        # --------------------------------------------------------
+        # Qdrant Cloud
+        # --------------------------------------------------------
+        elif qdrant_url:
+            if not qdrant_api_key:
+                raise ValueError(
+                    "QDRANT_API_KEY is required when QDRANT_URL is configured."
+                )
+
+            try:
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=qdrant_api_key,
+                    prefer_grpc=prefer_grpc,
+                    timeout=10.0,
+                )
+
+                # Test cloud connection
+                self.client.get_collections()
+
+                logger.info(
+                    "Successfully connected to Qdrant Cloud."
+                )
+
+            except Exception as e:
+                logger.error(
+                    f"Could not connect to Qdrant Cloud: {e}"
+                )
+                raise
+
+        # --------------------------------------------------------
+        # Local Docker Qdrant
+        # --------------------------------------------------------
         else:
             try:
                 self.client = QdrantClient(
-                    host=host,
-                    port=port,
+                    host=qdrant_host,
+                    port=qdrant_port,
                     prefer_grpc=prefer_grpc,
                     timeout=5.0,
                 )
-                # Test connection
+
+                # Test local connection
                 self.client.get_collections()
-                logger.info(f"Connected to Qdrant server at {host}:{port}")
+
+                logger.info(
+                    f"Connected to local Qdrant at "
+                    f"{qdrant_host}:{qdrant_port}"
+                )
+
             except Exception as e:
                 logger.warning(
-                    f"Could not connect to Qdrant at {host}:{port} ({e}). "
+                    f"Could not connect to local Qdrant at "
+                    f"{qdrant_host}:{qdrant_port} ({e}). "
                     f"Falling back to in-memory Qdrant instance."
                 )
-                self.client = QdrantClient(location=":memory:")
+
+                self.client = QdrantClient(
+                    location=":memory:"
+                )
 
         self.create_collection()
         self.create_image_collection()
