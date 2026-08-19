@@ -19,9 +19,10 @@ def search_agent(state: AgentState) -> AgentState:
     retrieval_service = RetrievalService()
 
     retrieval_result = retrieval_service.retrieve(
-        query=state["query"],
-        top_k=5
-    )
+    query=state["query"],
+    top_k=state["top_k"],
+    document_id=state["document_id"]
+)
 
     # Store citations returned by the retrieval service
     state["citations"] = retrieval_result["citations"]
